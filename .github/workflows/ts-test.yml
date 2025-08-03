@@ -41,24 +41,9 @@ jobs:
       - name: Apply patches
         run: chmod +x tools/patch.sh && tools/patch.sh
 
-      # ------------ 源码打包（关键新增步骤）[6,7](@ref) ------------
-      - name: Package patched source code
-        run: |
-          # 排除无关目录，包含隐藏文件（如 .vite）
-          tar --exclude='node_modules' \
-              --exclude='.git' \
-              --exclude='dist' \
-              -czf patched-source.tar.gz .
-        shell: bash
+      
 
-      - name: Upload patched source
-        uses: actions/upload-artifact@v4
-        with:
-          name: patched-source-code
-          path: patched-source.tar.gz
-          retention-days: 1
-          include-hidden-files: true  # 确保包含隐藏文件[7](@ref)
-
+      
       # ------------ TypeScript 项目流程 ------------
       - name: Install dependencies (TS)
         working-directory: embedders/ts
