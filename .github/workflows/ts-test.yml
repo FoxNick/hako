@@ -58,12 +58,7 @@ jobs:
         working-directory: embedders/ts
         run: bun generate:builds
         
-      - name: Upload embedders
-        uses: actions/upload-artifact@v4
-        with:
-          name: embedders
-          path: /home/runner/work/hako/hako/embedders
-      
+
       - name: Generate version (TS)
         working-directory: embedders/ts
         run: bun generate:version
@@ -75,3 +70,10 @@ jobs:
       - name: Build (TS)
         working-directory: embedders/ts
         run: bun run build
+        
+      - name: Upload hako
+        uses: actions/upload-artifact@v4
+        with:
+          name: embedders
+          path: /home/runner/work/hako/hako
+      
