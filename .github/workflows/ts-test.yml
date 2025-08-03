@@ -45,7 +45,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: patch
-          path: /home/runner/work/hako
+          path: /home/runner/work/hako/hako
 
 
       
