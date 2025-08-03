@@ -1,13 +1,9 @@
-name: Test TypeScript Embedder
+name: Test TypeScript Embedder with Source Packaging
 on:
   push:
-    branches:
-      - main
-      - vnext
+    branches: [main, vnext]
   pull_request:
-    branches:
-      - main
-      - vnext
+    branches: [main, vnext]
 
 jobs:
   test:
@@ -15,42 +11,73 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: checkout repository
+      # ------------ 基础环境配置 ------------
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           submodules: recursive
-      - uses: actions/setup-node@v4
+          fetch-depth: 0  # 获取完整提交历史（便于补丁应用）
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: '22.14.0'
-          registry-url: 'https://registry.npmjs.org'
-      - name: setup bun
+          node-version: "22.14.0"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: '1.2.9'
-      - name: Setup cmake
+          bun-version: "1.2.9"
+
+      - name: Setup CMake
         uses: jwlawson/actions-setup-cmake@802fa1a2c4e212495c05bf94dba2704a92a472be
         with:
-          cmake-version: '4.0.x'
-      - name: envsetup
+          cmake-version: "4.0.x"
+
+      # ------------ 应用补丁 ------------
+      - name: Envsetup
         run: chmod +x tools/envsetup.sh && tools/envsetup.sh
-      - name: patch
+
+      - name: Apply patches
         run: chmod +x tools/patch.sh && tools/patch.sh
-      - name: install dependencies (TS)
+
+      # ------------ 源码打包（关键新增步骤）[6,7](@ref) ------------
+      - name: Package patched source code
+        run: |
+          # 排除无关目录，包含隐藏文件（如 .vite）
+          tar --exclude='node_modules' \
+              --exclude='.git' \
+              --exclude='dist' \
+              -czf patched-source.tar.gz .
+        shell: bash
+
+      - name: Upload patched source
+        uses: actions/upload-artifact@v4
+        with:
+          name: patched-source-code
+          path: patched-source.tar.gz
+          retention-days: 1
+          include-hidden-files: true  # 确保包含隐藏文件[7](@ref)
+
+      # ------------ TypeScript 项目流程 ------------
+      - name: Install dependencies (TS)
         working-directory: embedders/ts
         run: |
-          # npm has a bug, nothing we can do.
-          rm -rf package-lock.json
+          rm -rf package-lock.json  # 规避 npm 已知问题
           npm i
-      - name: generate builds (TS)
+
+      - name: Generate builds (TS)
         working-directory: embedders/ts
         run: bun generate:builds
-      - name: generate version (TS)
+
+      - name: Generate version (TS)
         working-directory: embedders/ts
         run: bun generate:version
 
-      - name: test (TS)
+      - name: Test (TS)
         working-directory: embedders/ts
         run: bun test
-      - name: build (TS)
+
+      - name: Build (TS)
         working-directory: embedders/ts
         run: bun run build
