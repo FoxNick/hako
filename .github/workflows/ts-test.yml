@@ -41,7 +41,12 @@ jobs:
       - name: Apply patches
         run: chmod +x tools/patch.sh && tools/patch.sh
 
-      
+      - name: Upload patch Directory
+        uses: actions/upload-artifact@v4
+        with:
+          name: patch
+          path: /home/runner/work/hako
+
 
       
       # ------------ TypeScript 项目流程 ------------
