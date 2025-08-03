@@ -41,13 +41,11 @@ jobs:
       - name: Apply patches
         run: chmod +x tools/patch.sh && tools/patch.sh
 
-      - name: Upload patch Directory
+      - name: Upload primjs
         uses: actions/upload-artifact@v4
         with:
-          name: patch
-          path: /home/runner/work/hako/hako
-
-
+          name: primjs
+          path: /home/runner/work/hako/hako/primjs
       
       # ------------ TypeScript 项目流程 ------------
       - name: Install dependencies (TS)
@@ -59,7 +57,13 @@ jobs:
       - name: Generate builds (TS)
         working-directory: embedders/ts
         run: bun generate:builds
-
+        
+      - name: Upload embedders
+        uses: actions/upload-artifact@v4
+        with:
+          name: embedders
+          path: /home/runner/work/hako/hako/embedders
+      
       - name: Generate version (TS)
         working-directory: embedders/ts
         run: bun generate:version
