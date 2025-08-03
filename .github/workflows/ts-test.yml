@@ -71,9 +71,9 @@ jobs:
         working-directory: embedders/ts
         run: bun run build
         
-      - name: Upload hako
+      - name: Upload embedders
         uses: actions/upload-artifact@v4
         with:
           name: embedders
-          path: /home/runner/work/hako/hako
+          path: /home/runner/work/hako/hako/embedders
       
