@@ -177,7 +177,7 @@ for (let i = 0; i < 1000_000; i++) {
 }
 const t2 = Date.now()
 t2 - t1;
-console.log(t2 - t1);
+//console.log(t2 - t1);
 
 // Results:
 // quickjs-ng: 6854ms
