@@ -123,7 +123,7 @@ console.log("─".repeat(60));
 
 // Remove .wasm files from dist folder
 console.log("\n🧹 Cleaning up WASM files from dist folder...");
-try {
+/*try {
   const files = await fs.readdir(outputDir);
   const wasmFiles = files.filter((file) => file.endsWith(".wasm"));
 
@@ -141,4 +141,4 @@ try {
   }
 } catch (error) {
   console.error("❌ Failed to clean up .wasm files:", error.message);
-}
+}*/
