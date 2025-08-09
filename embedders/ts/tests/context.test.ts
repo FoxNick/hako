@@ -169,7 +169,20 @@ describe("JSContext", () => {
         : n <= 2 ? 1
         : fibonacci(n - 1) + fibonacci(n - 2)
 }
-fibonacci(50);
+//fibonacci(50);
+const t1 = Date.now()
+let str = '';
+for (let i = 0; i < 1000_000; i++) {
+  str += 'a';
+}
+const t2 = Date.now()
+t2 - t1;
+console.log(t2 - t1);
+
+// Results:
+// quickjs-ng: 6854ms
+// quickjs: 112ms
+// hako: 92ms
        `);
       expect(() => result.unwrap()).toThrow("interrupted");
     });
