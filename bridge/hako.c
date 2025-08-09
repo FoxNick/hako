@@ -1811,11 +1811,11 @@ LEPUSValue* WASM_EXPORT(HAKO_NewClass)(LEPUSContext* ctx, LEPUSClassID class_id,
                                        CString* class_name,
                                        LEPUS_BOOL has_finalizer) {
   LEPUSClassDef class_def = {
-      。class_name = class_name,
-      。finalizer = has_finalizer ? hako_class_finalizer_wrapper : NULL，
-      。gc_mark = NULL，
-      。call = NULL，
-      。exotic = NULL};
+      .class_name = class_name,
+      .finalizer = has_finalizer ? hako_class_finalizer_wrapper : NULL,
+      .gc_mark = NULL,
+      .call = NULL,
+      .exotic = NULL};
 
   // Register the class with the runtime
   if (LEPUS_NewClass(LEPUS_GetRuntime(ctx), class_id, &class_def) != 0) {
