@@ -169,17 +169,9 @@ describe("JSContext", () => {
         : n <= 2 ? 1
         : fibonacci(n - 1) + fibonacci(n - 2)
 }
-function test () {
-const t1 = Date.now()
-let str = '';
-for (let i = 0; i < 1000_000; i++) {
-  str += 'a';
-}
-const t2 = Date.now()
-return t2 - t1;
-}
-//fibonacci(50);
-test()+'';
+
+fibonacci(50);
+
        `);
       expect(() => result.unwrap()).toThrow("interrupted");
     });
