@@ -240,9 +240,17 @@ fibonacci(100);
     it("should create a base64 string with padding", () => {
       const base64String = "HelloQ==";
       using result = context.evalCode(`
-				const uint8Array = new Uint8Array([29, 233, 101, 161]);
-				uint8Array.toBase64()
+				//const uint8Array = new Uint8Array([29, 233, 101, 161]);
+				//uint8Array.toBase64()
+				const t1 = Date.now()
+				let str = '';
+				for (let i = 0; i < 1000_000; i++) {
+				  str += 'a';
+				}
+				const t2 = Date.now()
+				t2 - t1;
 		`);
+	  console.log("toBase64:", result.unwrap().asNumber());
       expect(result.unwrap().asString()).toEqual(base64String);
     });
 
