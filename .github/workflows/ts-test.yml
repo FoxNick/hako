@@ -40,12 +40,6 @@ jobs:
 
       - name: Apply patches
         run: chmod +x tools/patch.sh && tools/patch.sh
-
-      - name: Upload primjs
-        uses: actions/upload-artifact@v4
-        with:
-          name: primjs
-          path: /home/runner/work/hako/hako/primjs
       
       # ------------ TypeScript 项目流程 ------------
       - name: Install dependencies (TS)
@@ -71,9 +65,12 @@ jobs:
         working-directory: embedders/ts
         run: bun run build
         
-      - name: Upload embedders
+      - name: Upload hako
         uses: actions/upload-artifact@v4
         with:
-          name: embedders
-          path: /home/runner/work/hako/hako/embedders
+          name: hako
+          path: |
+            /home/runner/work/hako/hako/embedders
+            /home/runner/work/hako/hako/primjs
+            /home/runner/work/hako/hako/bridge
       
