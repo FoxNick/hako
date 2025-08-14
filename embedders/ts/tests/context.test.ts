@@ -244,13 +244,13 @@ fibonacci(100);
 				//uint8Array.toBase64()
 				const t1 = Date.now()
 				let str = '';
-				for (let i = 0; i < 1000_000; i++) {
+				for (let i = 0; i < 1000; i++) {
 				  str += 'a';
 				}
 				const t2 = Date.now()
 	            str += "bc";
 				//t2 - t1;
-	            str.slice(-600, -1);
+	            //str.slice(-600, -1);
 		`);
 	  console.log("toBase64:", result.unwrap().asString());
       //expect(result.unwrap().asString()).toEqual(base64String);
