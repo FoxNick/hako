@@ -248,7 +248,9 @@ fibonacci(100);
 				  str += 'a';
 				}
 				const t2 = Date.now()
-				t2 - t1;
+	            str += "bc";
+				//t2 - t1;
+	            str.slice(-600, -1);
 		`);
 	  console.log("toBase64:", result.unwrap().asNumber());
       //expect(result.unwrap().asString()).toEqual(base64String);
