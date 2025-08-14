@@ -248,7 +248,7 @@ fibonacci(100);
 				  str += 'a';
 				}
 				const t2 = Date.now()
-	            str += "bc";
+	            str = "bc" + str;
 				//t2 - t1;
 	            //str.slice(-600, -1);
 		`);
