@@ -252,7 +252,7 @@ fibonacci(100);
 				//t2 - t1;
 	            str.slice(-600, -1);
 		`);
-	  console.log("toBase64:", result.unwrap().asNumber());
+	  console.log("toBase64:", result.unwrap().asString());
       //expect(result.unwrap().asString()).toEqual(base64String);
     });
 
