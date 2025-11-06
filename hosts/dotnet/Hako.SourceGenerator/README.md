@@ -219,11 +219,11 @@ TypeScript definitions are automatically generated for all types with `[JSClass]
 
 - Primitives: `string`, `bool`, `int`, `long`, `float`, `double`, etc.
 - Arrays: `T[]` (primitive element types)
-- Byte buffers: `byte[]` → `ArrayBuffer`
+- Byte buffers: `byte[]` to `ArrayBuffer`
 - Typed arrays: `Uint8ArrayValue`, `Int32ArrayValue`, `Float64ArrayValue`, etc.
 - Custom types: Any type with `[JSClass]` or `[JSObject]`, or manually implementing `IJSMarshalable<T>`
-- Delegates: `Action<T>`, `Func<T>`, named delegates → JavaScript functions (sync and async)
-- Nullable types: `T?` → `T | null`
+- Delegates: `Action<T>`, `Func<T>`, named delegates to JavaScript functions (sync and async)
+- Nullable types: `T?` to `T | null`
 - Optional parameters: Default values supported
 
 ## Attributes

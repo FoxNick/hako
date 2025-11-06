@@ -290,7 +290,7 @@ var javascript = runtime.StripTypes(typescript);
 using var result = realm.EvalCode(javascript);
 ```
 
-Type stripping does **not** perform type checkingit only removes syntax.
+Type stripping does **not** perform type checkingit only removes syntax.
 
 ## Host Functions
 
@@ -732,13 +732,13 @@ await realm.EvalAsync(@"
 Bidirectional conversion:
 
 ```csharp
-// JS � C#
+// JS to C#
 var jsPoint = await realm.EvalAsync("new Point(10, 20)");
 var csPoint = jsPoint.ToInstance<Point>();
 Console.WriteLine($"X={csPoint.X}, Y={csPoint.Y}");
 jsPoint.Dispose();
 
-// C# � JS
+// C# to JS
 var point = new Point(5, 15);
 using var jsValue = point.ToJSValue(realm);
 var distance = await jsValue.GetProperty("distanceTo")
@@ -758,11 +758,11 @@ public partial record UserConfig(
     Action<string>? OnNotify = null
 );
 
-// C# � JS
+// C# ï¿½ JS
 var config = new UserConfig("Alice", 30, "alice@example.com");
 using var jsConfig = config.ToJSValue(realm);
 
-// JS � C#
+// JS ï¿½ C#
 var jsObj = await realm.EvalAsync(@"
     ({ name: 'Bob', age: 25, email_address: 'bob@example.com' })
 ");
