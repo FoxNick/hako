@@ -161,8 +161,8 @@ This repository contains multiple packages:
 | Package | Description | NuGet |
 |---------|-------------|-------|
 | **[Hako](./Hako/)** | Core JavaScript runtime and APIs | [![NuGet](https://img.shields.io/nuget/v/Hako.svg)](https://www.nuget.org/packages/Hako/) |
-| **[Hako.Backend.Wasmtime](./Hako.Backend.Wasmtime/)** | Production Wasmtime backend | [![NuGet](https://img.shields.io/nuget/v/Hako.Backend.Wasmtime.svg)](https://www.nuget.org/packages/Hako.Backend.Wasmtime/) |
-| **[Hako.Backend.WACS](./Hako.Backend.WACS/)** | Experimental WACS backend (AOT) | [![NuGet](https://img.shields.io/nuget/v/Hako.Backend.WACS.svg)](https://www.nuget.org/packages/Hako.Backend.WACS/) |
+| **[Hako.Backend.Wasmtime](./Hako.Backend.Wasmtime/)** | wasmtime backend | [![NuGet](https://img.shields.io/nuget/v/Hako.Backend.Wasmtime.svg)](https://www.nuget.org/packages/Hako.Backend.Wasmtime/) |
+| **[Hako.Backend.WACS](./Hako.Backend.WACS/)** | WACS backend | [![NuGet](https://img.shields.io/nuget/v/Hako.Backend.WACS.svg)](https://www.nuget.org/packages/Hako.Backend.WACS/) |
 | **[Hako.SourceGenerator](./Hako.SourceGenerator/)** | Automatic binding generator | [![NuGet](https://img.shields.io/nuget/v/Hako.SourceGenerator.svg)](https://www.nuget.org/packages/Hako.SourceGenerator/) |
 | **[Hako.Backend](./Hako.Backend/)** | Backend abstraction interfaces | [![NuGet](https://img.shields.io/nuget/v/Hako.Backend.svg)](https://www.nuget.org/packages/Hako.Backend/) |
 
@@ -184,6 +184,7 @@ This repository contains multiple packages:
 - Multiple isolated realms
 - Memory and execution limits
 - Rich extension methods for safe API usage
+- No reflection. AOT is fully supported. See backends for more information.
 
 ## Resources
 
