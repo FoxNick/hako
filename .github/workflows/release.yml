@@ -72,11 +72,11 @@ jobs:
 
       - name: Pack Hako.Analyzers
         working-directory: hosts/dotnet/Hako.Analyzers
-        run: dotnet pack -c Release /p:Packing=true /p:HakoVersion=${{ steps.version.outputs.VERSION }} /p:IncludeSymbols=true /p:SymbolPackageFormat=snupkg
+        run: dotnet pack -c Release /p:Packing=true /p:HakoVersion=${{ steps.version.outputs.VERSION }}
 
       - name: Pack Hako.SourceGenerator
         working-directory: hosts/dotnet/Hako.SourceGenerator
-        run: dotnet pack -c Release /p:Packing=true /p:HakoVersion=${{ steps.version.outputs.VERSION }} /p:IncludeSymbols=true /p:SymbolPackageFormat=snupkg
+        run: dotnet pack -c Release /p:Packing=true /p:HakoVersion=${{ steps.version.outputs.VERSION }}
 
       - name: Upload packages
         uses: actions/upload-artifact@v4

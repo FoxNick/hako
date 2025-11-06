@@ -758,11 +758,11 @@ public partial record UserConfig(
     Action<string>? OnNotify = null
 );
 
-// C# ï¿½ JS
+// C# to JS
 var config = new UserConfig("Alice", 30, "alice@example.com");
 using var jsConfig = config.ToJSValue(realm);
 
-// JS ï¿½ C#
+// JS to C#
 var jsObj = await realm.EvalAsync(@"
     ({ name: 'Bob', age: 25, email_address: 'bob@example.com' })
 ");
