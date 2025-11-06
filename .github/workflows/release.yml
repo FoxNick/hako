@@ -82,7 +82,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: nuget-packages
-          path: hosts/dotnet/**/bin/Release/*.nupkg
+          path: |
+            hosts/dotnet/**/bin/Release/*.nupkg
+            hosts/dotnet/**/bin/Release/*.snupkg
           retention-days: 30
           if-no-files-found: error
 
@@ -106,7 +108,7 @@ jobs:
       - name: Generate checksums
         run: |
           cd packages
-          find . -name "*.nupkg" -exec shasum -a 256 {} \; > checksums.txt
+          find . -name "*.nupkg" -o -name "*.snupkg" | xargs shasum -a 256 > checksums.txt
           cat checksums.txt
 
       - name: Create Release
@@ -115,6 +117,7 @@ jobs:
         with:
           files: |
             packages/**/*.nupkg
+            packages/**/*.snupkg
             packages/checksums.txt
           body: |
             ## Hako ${{ steps.tag.outputs.TAG_NAME }}
@@ -160,6 +163,6 @@ jobs:
 
       - name: Publish to NuGet
         run: |
-          for package in packages/**/*.nupkg; do
+          for package in packages/**/*.nupkg packages/**/*.snupkg; do
             dotnet nuget push "$package" -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json --skip-duplicate
           done
