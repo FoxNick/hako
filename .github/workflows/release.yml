@@ -56,27 +56,27 @@ jobs:
 
       - name: Pack Hako
         working-directory: hosts/dotnet/Hako
-        run: dotnet pack -c Release /p:Packing=true /p:HakoVersion=${{ steps.version.outputs.VERSION }}
+        run: dotnet pack -c Release /p:Packing=true /p:HakoVersion=${{ steps.version.outputs.VERSION }} /p:IncludeSymbols=true /p:SymbolPackageFormat=snupkg
 
       - name: Pack Hako.Backend
         working-directory: hosts/dotnet/Hako.Backend
-        run: dotnet pack -c Release /p:Packing=true /p:HakoVersion=${{ steps.version.outputs.VERSION }}
+        run: dotnet pack -c Release /p:Packing=true /p:HakoVersion=${{ steps.version.outputs.VERSION }} /p:IncludeSymbols=true /p:SymbolPackageFormat=snupkg
 
       - name: Pack Hako.Backend.Wasmtime
         working-directory: hosts/dotnet/Hako.Backend.Wasmtime
-        run: dotnet pack -c Release /p:Packing=true /p:HakoVersion=${{ steps.version.outputs.VERSION }}
+        run: dotnet pack -c Release /p:Packing=true /p:HakoVersion=${{ steps.version.outputs.VERSION }} /p:IncludeSymbols=true /p:SymbolPackageFormat=snupkg
 
       - name: Pack Hako.Backend.WACS
         working-directory: hosts/dotnet/Hako.Backend.WACS
-        run: dotnet pack -c Release /p:Packing=true /p:HakoVersion=${{ steps.version.outputs.VERSION }}
+        run: dotnet pack -c Release /p:Packing=true /p:HakoVersion=${{ steps.version.outputs.VERSION }} /p:IncludeSymbols=true /p:SymbolPackageFormat=snupkg
 
       - name: Pack Hako.Analyzers
         working-directory: hosts/dotnet/Hako.Analyzers
-        run: dotnet pack -c Release /p:Packing=true /p:HakoVersion=${{ steps.version.outputs.VERSION }}
+        run: dotnet pack -c Release /p:Packing=true /p:HakoVersion=${{ steps.version.outputs.VERSION }} /p:IncludeSymbols=true /p:SymbolPackageFormat=snupkg
 
       - name: Pack Hako.SourceGenerator
         working-directory: hosts/dotnet/Hako.SourceGenerator
-        run: dotnet pack -c Release /p:Packing=true /p:HakoVersion=${{ steps.version.outputs.VERSION }}
+        run: dotnet pack -c Release /p:Packing=true /p:HakoVersion=${{ steps.version.outputs.VERSION }} /p:IncludeSymbols=true /p:SymbolPackageFormat=snupkg
 
       - name: Upload packages
         uses: actions/upload-artifact@v4
