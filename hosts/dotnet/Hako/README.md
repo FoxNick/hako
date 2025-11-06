@@ -1207,6 +1207,6 @@ await Hako.Dispatcher.InvokeAsync(async () =>
 ---
 
 **See Also:**
-- [Hako.Backend.Wasmtime](http://github.com/6over3/hako/hosts/dotnet/Hako.Backend.Wasmtime/) - Wasmtime backend
-- [Hako.Backend.WACS](http://github.com/6over3/hako/hosts/dotnet/Hako.Backend.WACS/) - WACS backend
-- [Hako.SourceGenerator](http://github.com/6over3/hako/hosts/dotnet/Hako.SourceGenerator/) - Binding generator
+- [Hako.Backend.Wasmtime](https://github.com/6over3/hako/tree/main/hosts/dotnet/Hako.Backend.Wasmtime/) - Wasmtime backend
+- [Hako.Backend.WACS](https://github.com/6over3/hako/tree/main/hosts/dotnet/Hako.Backend.WACS/) - WACS backend
+- [Hako.SourceGenerator](https://github.com/6over3/hako/tree/main/hosts/dotnet/Hako.SourceGenerator/) - Binding generator
