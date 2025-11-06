@@ -1,0 +1,54 @@
+name: Build hako.wasm
+on:
+  push:
+    tags:
+      - 'v*'
+    branches:
+      - '**'
+  pull_request:
+    branches:
+      - '**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install WASI SDK
+        uses: konsumer/install-wasi-sdk@v1
+        with:
+          version: "27"
+
+      - name: Install Binaryen
+        run: |
+          curl -L https://github.com/WebAssembly/binaryen/releases/download/version_124/binaryen-version_124-x86_64-linux.tar.gz -o binaryen.tar.gz
+          tar -xzf binaryen.tar.gz
+          sudo cp binaryen-version_124/bin/* /opt/
+          rm -rf binaryen.tar.gz binaryen-version_124
+          echo "/opt" >> $GITHUB_PATH
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Build hako.wasm
+        working-directory: engine
+        run: ./release-hako.sh
+
+      - name: Generate bindings
+        working-directory: engine
+        run: bun run codegen.ts parse hako.wasm hako.h bindings.json
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: hako-wasm
+          path: |
+            engine/hako.wasm
+            engine/bindings.json
+          retention-days: 90
+          if-no-files-found: error

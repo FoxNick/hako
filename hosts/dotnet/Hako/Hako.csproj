@@ -1,0 +1,66 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFrameworks>net9.0;net10.0</TargetFrameworks>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <RootNamespace>HakoJS</RootNamespace>
+        <LangVersion>preview</LangVersion>
+        <IsAotCompatible>true</IsAotCompatible>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <AssemblyName>Hako</AssemblyName>
+        <PackageId>Hako</PackageId>
+        <Authors>Andrew Sampson</Authors>
+        <Owners>6over3 Institute</Owners>
+        <Version>$(HakoPackageVersion)</Version>
+        <IncludeSymbols>true</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+        <RepositoryUrl>https://github.com/6over3/hako/hosts/dotnet</RepositoryUrl>
+        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <EmbedUntrackedSources>true</EmbedUntrackedSources>
+        <Summary>A standalone and embeddable JavaScript engine</Summary>
+        <PackageTags>webassembly, .net, wasm, javascript, typescript</PackageTags>
+        <Title>Hako</Title>
+        <PackageDescription>
+            A .NET host for Hako
+
+            Hako is a standalone and embeddable JavaScript engine.
+
+            The .NET host of Hako enables .NET code to run JavaScript/TypeScript in a secure sandbox.
+        </PackageDescription>
+        <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <EnablePackageValidation>true</EnablePackageValidation>
+        <ContinuousIntegrationBuild Condition="'$(DevBuild)'=='false'">true</ContinuousIntegrationBuild>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="README.md" Pack="true" PackagePath="\" />
+    </ItemGroup>
+    
+    <ItemGroup>
+        <PackageReference Include="Embed.Generator" Version="1.0.0">
+          <PrivateAssets>all</PrivateAssets>
+          <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="JetBrains.Annotations" Version="2025.2.2"/>
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="Hako.Tests"/>
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Resources\" />
+        <AdditionalFiles Include="Resources\**\*" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\Hako.Backend\Hako.Backend.csproj" />
+    </ItemGroup>
+    
+</Project>

@@ -1,0 +1,48 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFrameworks>net9.0;net10.0</TargetFrameworks>
+        <ImplicitUsings>disable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <RootNamespace>HakoJS.Backend.Wasmtime</RootNamespace>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <AssemblyName>Hako.Backend.Wasmtime</AssemblyName>
+        <PackageId>Hako.Backend.Wasmtime</PackageId>
+        <Authors>Andrew Sampson</Authors>
+        <Owners>6over3 Institute</Owners>
+        <Version>$(HakoPackageVersion)</Version>
+        <IncludeSymbols>true</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+        <RepositoryUrl>https://github.com/6over3/hako/hosts/dotnet</RepositoryUrl>
+        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <EmbedUntrackedSources>true</EmbedUntrackedSources>
+        <Summary>A Hako backend using wasmtime</Summary>
+        <PackageTags>webassembly, .net, wasm, javascript, typescript</PackageTags>
+        <Title>Hako (wasmtime)</Title>
+        <PackageDescription>
+            A Hako backend which uses https://github.com/bytecodealliance/wasmtime
+
+            This backend leverages the Cranelift JIT compiler to maximize performance.
+        </PackageDescription>
+        <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <EnablePackageValidation>true</EnablePackageValidation>
+        <ContinuousIntegrationBuild Condition="'$(DevBuild)'=='false'">true</ContinuousIntegrationBuild>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="README.md" Pack="true" PackagePath="\" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Hako.Backend\Hako.Backend.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+      <PackageReference Include="Wasmtime.6over3" Version="38.0.3-dev" />
+    </ItemGroup>
+
+</Project>

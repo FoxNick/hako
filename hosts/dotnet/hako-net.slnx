@@ -1,0 +1,31 @@
+<Solution>
+  <Folder Name="/examples/">
+    <Project Path="examples\basics\basics.csproj" Type="Classic C#" />
+    <Project Path="examples\bytecode\bytecode.csproj" Type="Classic C#" />
+    <Project Path="examples\classes\classes.csproj" Type="Classic C#" />
+    <Project Path="examples\host-functions\host-functions.csproj" Type="Classic C#" />
+    <Project Path="examples\iteration\iteration.csproj" Type="Classic C#" />
+    <Project Path="examples\marshaling\marshaling.csproj" Type="Classic C#" />
+    <Project Path="examples\modules\modules.csproj" Type="Classic C#" />
+    <Project Path="examples\raylib\raylib.csproj" Type="Classic C#" />
+    <Project Path="examples\safety\safety.csproj" Type="Classic C#" />
+    <Project Path="examples\scopes\scopes.csproj" Type="Classic C#" />
+    <Project Path="examples\timers\timers.csproj" Type="Classic C#" />
+    <Project Path="examples\typescript\typescript.csproj" Type="Classic C#" />
+  </Folder>
+  <Folder Name="/scripts/">
+    <File Path="scripts\build-engine.sh" />
+    <File Path="scripts\build-engine.ps1" />
+    <File Path="scripts\codegen.sh" />
+  </Folder>
+  <Project Path="Hako.Analyzers.Tests\Hako.Analyzers.Tests.csproj" Type="Classic C#" />
+  <Project Path="Hako.Analyzers\Hako.Analyzers.csproj" Type="Classic C#" />
+  <Project Path="Hako.Backend.WACS\Hako.Backend.WACS.csproj" Type="Classic C#" />
+  <Project Path="Hako.Backend.Wasmtime\Hako.Backend.Wasmtime.csproj" Type="Classic C#" />
+  <Project Path="Hako.Backend\Hako.Backend.csproj" Type="Classic C#" />
+  <Project Path="Hako.SourceGenerator.Tests/Hako.SourceGenerator.Tests.csproj" Type="Classic C#" />
+  <Project Path="Hako.SourceGenerator/Hako.SourceGenerator.csproj" Type="Classic C#" />
+  <Project Path="Hako.Tests\Hako.Tests.csproj" Type="Classic C#" />
+  <Project Path="Hako/Hako.csproj" />
+  <Project Path="HakoBenchmarkSuite\HakoBenchmarkSuite.csproj" Type="Classic C#" />
+</Solution>

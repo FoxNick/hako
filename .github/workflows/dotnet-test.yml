@@ -1,0 +1,70 @@
+name: .NET Host Tests
+on:
+  push:
+    branches:
+      - '**'
+    paths:
+      - 'hosts/dotnet/**'
+      - 'engine/**'
+      - '.github/workflows/dotnet-test.yml'
+  pull_request:
+    branches:
+      - '**'
+    paths:
+      - 'hosts/dotnet/**'
+      - 'engine/**'
+      - '.github/workflows/dotnet-test.yml'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install WASI SDK
+        uses: konsumer/install-wasi-sdk@v1
+        with:
+          version: "27"
+
+      - name: Install Binaryen
+        run: |
+          curl -L https://github.com/WebAssembly/binaryen/releases/download/version_124/binaryen-version_124-x86_64-linux.tar.gz -o binaryen.tar.gz
+          tar -xzf binaryen.tar.gz
+          sudo cp binaryen-version_124/bin/* /opt/
+          rm -rf binaryen.tar.gz binaryen-version_124
+          echo "/opt" >> $GITHUB_PATH
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            10.0.x
+            9.0.x
+          dotnet-quality: 'preview'
+
+      - name: Build engine
+        working-directory: hosts/dotnet/scripts
+        run: ./build-engine.sh
+
+      - name: Restore solution
+        working-directory: hosts/dotnet
+        run: dotnet restore
+
+      - name: Test Hako.Analyzers.Tests
+        working-directory: hosts/dotnet/Hako.Analyzers.Tests
+        run: dotnet test
+
+      - name: Test Hako.SourceGenerator.Tests
+        working-directory: hosts/dotnet/Hako.SourceGenerator.Tests
+        run: dotnet test
+
+      - name: Test Hako.Tests
+        working-directory: hosts/dotnet/Hako.Tests
+        run: dotnet test

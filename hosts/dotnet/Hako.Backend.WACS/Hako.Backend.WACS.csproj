@@ -1,0 +1,49 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFrameworks>net9.0;net10.0</TargetFrameworks>
+        <ImplicitUsings>disable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <RootNamespace>HakoJS.Backend.WACS</RootNamespace>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <AssemblyName>Hako.Backend.WACS</AssemblyName>
+        <PackageId>Hako.Backend.WACS</PackageId>
+        <Authors>Andrew Sampson</Authors>
+        <Version>$(HakoPackageVersion)</Version>
+        <Owners>6over3 Institute</Owners>
+        <IncludeSymbols>true</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+        <RepositoryUrl>https://github.com/6over3/hako/hosts/dotnet</RepositoryUrl>
+        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <EmbedUntrackedSources>true</EmbedUntrackedSources>
+        <Summary>A Hako backend using WACS</Summary>
+        <PackageTags>webassembly, .net, wasm, javascript, typescript</PackageTags>
+        <Title>Hako (WACS)</Title>
+        <PackageDescription>
+            A Hako backend which uses https://github.com/kelnishi/WACS, a WebAssembly runtime implemented in .NET
+            
+            Using this backend allows a .NET application using Hako to compile to any target where .NET is supported
+        </PackageDescription>
+        <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <EnablePackageValidation>true</EnablePackageValidation>
+        <ContinuousIntegrationBuild Condition="'$(DevBuild)'=='false'">true</ContinuousIntegrationBuild>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="README.md" Pack="true" PackagePath="\" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Hako.Backend\Hako.Backend.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+      <PackageReference Include="WACS" Version="0.7.5" />
+      <PackageReference Include="WACS.WASIp1" Version="0.9.7" />
+    </ItemGroup>
+
+</Project>

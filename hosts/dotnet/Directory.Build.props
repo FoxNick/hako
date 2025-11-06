@@ -1,0 +1,9 @@
+﻿<Project>
+    <PropertyGroup>
+        <DevBuild Condition="'$(DevBuild)'==''">true</DevBuild>
+        <HakoVersion Condition="'$(HakoVersion)'==''">1.0.0</HakoVersion>
+        <HakoDotnetVersion Condition="'$(HakoDotnetVersion)'==''"></HakoDotnetVersion>
+        <HakoPackageVersion Condition="'$(DevBuild)'=='true'">$(HakoVersion)$(HakoDotnetVersion)-dev</HakoPackageVersion>
+        <HakoPackageVersion Condition="'$(HakoPackageVersion)'==''">$(HakoVersion)$(HakoDotnetVersion)</HakoPackageVersion>
+    </PropertyGroup>
+</Project>

@@ -1,0 +1,163 @@
+name: Release
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  package:
+    name: Package NuGet Packages
+    runs-on: ubuntu-latest
+    env:
+      DevBuild: 'false'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install WASI SDK
+        uses: konsumer/install-wasi-sdk@v1
+        with:
+          version: "27"
+
+      - name: Install Binaryen
+        run: |
+          curl -L https://github.com/WebAssembly/binaryen/releases/download/version_124/binaryen-version_124-x86_64-linux.tar.gz -o binaryen.tar.gz
+          tar -xzf binaryen.tar.gz
+          sudo cp binaryen-version_124/bin/* /opt/
+          rm -rf binaryen.tar.gz binaryen-version_124
+          echo "/opt" >> $GITHUB_PATH
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            10.0.x
+            9.0.x
+          dotnet-quality: 'preview'
+
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME:1}" >> $GITHUB_OUTPUT
+
+      - name: Build engine
+        working-directory: hosts/dotnet/scripts
+        run: ./build-engine.sh
+
+      - name: Restore solution
+        working-directory: hosts/dotnet
+        run: dotnet restore
+
+      - name: Pack Hako
+        working-directory: hosts/dotnet/Hako
+        run: dotnet pack -c Release /p:Packing=true /p:HakoVersion=${{ steps.version.outputs.VERSION }}
+
+      - name: Pack Hako.Backend
+        working-directory: hosts/dotnet/Hako.Backend
+        run: dotnet pack -c Release /p:Packing=true /p:HakoVersion=${{ steps.version.outputs.VERSION }}
+
+      - name: Pack Hako.Backend.Wasmtime
+        working-directory: hosts/dotnet/Hako.Backend.Wasmtime
+        run: dotnet pack -c Release /p:Packing=true /p:HakoVersion=${{ steps.version.outputs.VERSION }}
+
+      - name: Pack Hako.Backend.WACS
+        working-directory: hosts/dotnet/Hako.Backend.WACS
+        run: dotnet pack -c Release /p:Packing=true /p:HakoVersion=${{ steps.version.outputs.VERSION }}
+
+      - name: Pack Hako.Analyzers
+        working-directory: hosts/dotnet/Hako.Analyzers
+        run: dotnet pack -c Release /p:Packing=true /p:HakoVersion=${{ steps.version.outputs.VERSION }}
+
+      - name: Pack Hako.SourceGenerator
+        working-directory: hosts/dotnet/Hako.SourceGenerator
+        run: dotnet pack -c Release /p:Packing=true /p:HakoVersion=${{ steps.version.outputs.VERSION }}
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-packages
+          path: hosts/dotnet/**/bin/Release/*.nupkg
+          retention-days: 30
+          if-no-files-found: error
+
+  create-release:
+    name: Create GitHub Release
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Get tag name
+        id: tag
+        run: echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget-packages
+          path: packages
+
+      - name: Generate checksums
+        run: |
+          cd packages
+          find . -name "*.nupkg" -exec shasum -a 256 {} \; > checksums.txt
+          cat checksums.txt
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        if: github.ref_type == 'tag'
+        with:
+          files: |
+            packages/**/*.nupkg
+            packages/checksums.txt
+          body: |
+            ## Hako ${{ steps.tag.outputs.TAG_NAME }}
+
+            ### .NET Packages
+
+            Install via NuGet:
+            ```bash
+            dotnet add package Hako --version ${{ steps.tag.outputs.TAG_NAME }}
+            dotnet add package Hako.Backend.Wasmtime --version ${{ steps.tag.outputs.TAG_NAME }}
+            ```
+
+            ### Packages Included
+
+            - `Hako` - Core JavaScript engine
+            - `Hako.Backend` - Backend abstraction
+            - `Hako.Backend.Wasmtime` - [wasmtime](https://wasmtime.dev/) backend
+            - `Hako.Backend.WACS` - [WACS](https://github.com/kelnishi/WACS) backend
+            - `Hako.Analyzers` - Roslyn analyzers
+            - `Hako.SourceGenerator` - Source generators for bindings
+
+            ### Checksums
+
+            See `checksums.txt` for SHA-256 checksums of all packages.
+          draft: false
+          prerelease: false
+
+  publish:
+    name: Publish to NuGet
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget-packages
+          path: packages
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Publish to NuGet
+        run: |
+          for package in packages/**/*.nupkg; do
+            dotnet nuget push "$package" -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json --skip-duplicate
+          done
