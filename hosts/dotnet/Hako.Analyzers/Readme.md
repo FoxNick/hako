@@ -49,4 +49,4 @@ Module exports must be explicitly declared using `AddExport` or `AddExports`. Fo
 
 ## Documentation
 
-See the [main Hako documentation](https://github.com/6over3/hako/hosts/dotnet) for complete API reference.
+See the [main Hako documentation](https://github.com/6over3/hako/tree/main/hosts/dotnet) for complete API reference.

@@ -21,7 +21,7 @@
         <Version>$(HakoPackageVersion)</Version>
         <IncludeSymbols>true</IncludeSymbols>
         <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-        <RepositoryUrl>https://github.com/6over3/hako/hosts/dotnet</RepositoryUrl>
+        <RepositoryUrl>https://github.com/6over3/hako</RepositoryUrl>
         <PublishRepositoryUrl>true</PublishRepositoryUrl>
         <EmbedUntrackedSources>true</EmbedUntrackedSources>
         <Summary>A source generator for Hako</Summary>

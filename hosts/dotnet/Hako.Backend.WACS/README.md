@@ -32,4 +32,4 @@ Use WACS when maximum portability is more important than raw performance.
 
 ## Documentation
 
-See the [main Hako documentation](https://github.com/6over3/hako/hosts/dotnet) for complete usage and API reference.
+See the [main Hako documentation](https://github.com/6over3/hako/tree/main/hosts/dotnet) for complete usage and API reference.

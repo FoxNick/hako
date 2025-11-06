@@ -17,10 +17,9 @@
         <Authors>Andrew Sampson</Authors>
         <Owners>6over3 Institute</Owners>
         <Version>$(HakoPackageVersion)</Version>
-        <RepositoryUrl>https://github.com/6over3/hako/hosts/dotnet</RepositoryUrl>
         <IncludeSymbols>true</IncludeSymbols>
         <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-        <RepositoryUrl>https://github.com/6over3/hako-dotnet</RepositoryUrl>
+        <RepositoryUrl>https://github.com/6over3/hako</RepositoryUrl>
         <PublishRepositoryUrl>true</PublishRepositoryUrl>
         <EmbedUntrackedSources>true</EmbedUntrackedSources>
         <Summary>A backend abstraction for Hako</Summary>

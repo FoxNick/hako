@@ -249,4 +249,4 @@ TypeScript definitions are automatically generated for all types with `[JSClass]
 
 XML documentation comments (`///`) are automatically converted to JSDoc format in the generated TypeScript definitions.
 
-See the [main Hako documentation](https://github.com/6over3/hako/hosts/dotnet) for complete usage and API reference
+See the [main Hako documentation](https://github.com/6over3/hako/tree/main/hosts/dotnet) for complete usage and API reference

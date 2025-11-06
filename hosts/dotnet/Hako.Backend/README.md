@@ -13,8 +13,8 @@ This package provides the core interfaces and abstractions for implementing cust
 
 To implement your own backend, reference this package and implement the required interfaces. See the existing backend implementations as reference:
 
-- [Wasmtime Backend Implementation](https://github.com/6over3/hako/hosts/dotnet/Hako.Backend.Wasmtime)
-- [WACS Backend Implementation](https://github.com/6over3/hako/hosts/dotnet/Hako.Backend.WACS)
+- [Wasmtime Backend Implementation](https://github.com/6over3/hako/tree/main/hosts/dotnet/Hako.Backend.Wasmtime)
+- [WACS Backend Implementation](https://github.com/6over3/hako/tree/main/hosts/dotnet/Hako.Backend.WACS)
 
 ## Installation
 
@@ -24,4 +24,4 @@ dotnet add package Hako.Backend
 
 ## Documentation
 
-See the [main Hako documentation](https://github.com/6over3/hako/hosts/dotnet) for complete API reference.
+See the [main Hako documentation](https://github.com/6over3/hako/tree/main/hosts/dotnet) for complete API reference.

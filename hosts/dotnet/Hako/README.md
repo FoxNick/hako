@@ -1081,10 +1081,10 @@ Console.WriteLine(dump);
 ### Resource Management
 
 ```csharp
-//  Correct - using statement
+//  Correct - using statement
 using var value = realm.NewNumber(42);
 
-//  Correct - try/finally
+//  Correct - try/finally
 var obj = realm.NewObject();
 try
 {
@@ -1095,7 +1095,7 @@ finally
     obj.Dispose();
 }
 
-//  Best - scoped disposal
+//  Best - scoped disposal
 realm.UseScope((r, scope) =>
 {
     var obj = scope.Defer(r.NewObject());
@@ -1132,13 +1132,13 @@ if (obj.HasProperty("email"))
 ### Minimizing Allocations
 
 ```csharp
-//  Creates temporary JSValue per iteration
+//  Creates temporary JSValue per iteration
 for (int i = 0; i < 1000; i++)
 {
     await realm.EvalAsync($"process({i})");
 }
 
-//  Reuse function reference
+//  Reuse function reference
 using var process = await realm.EvalAsync("process");
 for (int i = 0; i < 1000; i++)
 {
@@ -1151,13 +1151,13 @@ for (int i = 0; i < 1000; i++)
 
 **Not disposing values**
 ```csharp
-//  Memory leak
+//  Memory leak
 for (int i = 0; i < 1000; i++)
 {
     var val = realm.NewObject(); // Never disposed!
 }
 
-//  Correct
+//  Correct
 for (int i = 0; i < 1000; i++)
 {
     using var val = realm.NewObject();
@@ -1171,14 +1171,14 @@ using (var realm = runtime.CreateRealm())
 {
     value = realm.NewString("hello").Dup();
 }
-value.AsString(); //  Throws - realm was disposed
+value.AsString(); //  Throws - realm was disposed
 ```
 
 **Forgetting WithConsole()**
 ```csharp
 var realm = runtime.CreateRealm();
 await realm.EvalAsync("console.log('hi')");
-//  Error: console is not defined
+//  Error: console is not defined
 ```
 
 **Blocking event loop**
@@ -1186,7 +1186,7 @@ await realm.EvalAsync("console.log('hi')");
 await Hako.Dispatcher.InvokeAsync(async () =>
 {
     var result = await realm.EvalAsync("code");
-    Thread.Sleep(1000); //  Blocks event loop!
+    Thread.Sleep(1000); //  Blocks event loop!
 });
 ```
 

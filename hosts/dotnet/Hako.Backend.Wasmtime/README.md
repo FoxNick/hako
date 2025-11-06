@@ -37,4 +37,4 @@ When publishing with native AOT compilation, you can statically link Wasmtime li
 
 ## Documentation
 
-See the [main Hako documentation](https://github.com/6over3/hako/hosts/dotnett) for complete usage and API reference.
+See the [main Hako documentation](https://github.com/6over3/hako/tree/main/hosts/dotnett) for complete usage and API reference.
