@@ -14,6 +14,7 @@ on:
       - 'hosts/dotnet/**'
       - 'engine/**'
       - '.github/workflows/dotnet-test.yml'
+  workflow_call:
   workflow_dispatch:
 
 jobs:
@@ -30,16 +31,14 @@ jobs:
         with:
           version: "27"
 
-      - name: Install Binaryen
-        run: |
-          curl -L https://github.com/WebAssembly/binaryen/releases/download/version_124/binaryen-version_124-x86_64-linux.tar.gz -o binaryen.tar.gz
-          tar -xzf binaryen.tar.gz
-          sudo cp binaryen-version_124/bin/* /opt/
-          rm -rf binaryen.tar.gz binaryen-version_124
-          echo "/opt" >> $GITHUB_PATH
+      - name: Setup Binaryen
+        uses: ./.github/actions/setup-binaryen
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
+
+      - name: Setup WABT
+        uses: ./.github/actions/setup-wabt
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
