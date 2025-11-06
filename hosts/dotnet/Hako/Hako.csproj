@@ -18,7 +18,7 @@
         <Version>$(HakoPackageVersion)</Version>
         <IncludeSymbols>true</IncludeSymbols>
         <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-        <RepositoryUrl>https://github.com/6over3/hako/tree/main/hosts/dotnet</RepositoryUrl>
+        <RepositoryUrl>https://github.com/6over3/hako</RepositoryUrl>
         <PublishRepositoryUrl>true</PublishRepositoryUrl>
         <EmbedUntrackedSources>true</EmbedUntrackedSources>
         <Summary>A standalone and embeddable JavaScript engine</Summary>

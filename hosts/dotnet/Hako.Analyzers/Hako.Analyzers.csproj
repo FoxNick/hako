@@ -20,7 +20,7 @@
         <IncludeSymbols>true</IncludeSymbols>
         <Version>$(HakoPackageVersion)</Version>
         <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-        <RepositoryUrl>https://github.com/6over3/hako/tree/main/hosts/dotnet</RepositoryUrl>
+        <RepositoryUrl>https://github.com/6over3/hako</RepositoryUrl>
         <PublishRepositoryUrl>true</PublishRepositoryUrl>
         <EmbedUntrackedSources>true</EmbedUntrackedSources>
         <Summary>Roslyn analyzers for Hako</Summary>
