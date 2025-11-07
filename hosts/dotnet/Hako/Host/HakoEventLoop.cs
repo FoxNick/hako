@@ -38,7 +38,7 @@ internal sealed class HakoEventLoop : IDisposable
         _eventLoopThread = new Thread(RunEventLoop)
         {
             Name = "HakoJS-EventLoop",
-            IsBackground = false,
+            IsBackground = true,
             Priority = ThreadPriority.Normal
         };
         _eventLoopThread.Start();
@@ -328,23 +328,28 @@ internal sealed class HakoEventLoop : IDisposable
     /// <summary>
     /// Requests that the event loop stop processing work items.
     /// </summary>
+    /// <param name="cancellationToken">A cancellation token to observe while waiting for the event loop to stop.</param>
     /// <returns>A task that completes when the event loop has stopped.</returns>
-    public Task StopAsync()
+    public async Task StopAsync(CancellationToken cancellationToken = default)
     {
         if (!_disposed)
         {
-            _shutdownCts.Cancel();
+            await _shutdownCts.CancelAsync();
             _workQueue.Writer.Complete();
         }
 
-        return _shutdownComplete.Task;
+        await _shutdownComplete.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
     /// Waits for the event loop to exit.
     /// </summary>
+    /// <param name="cancellationToken">A cancellation token to observe while waiting for the event loop to exit.</param>
     /// <returns>A task that completes when the event loop has exited.</returns>
-    public Task WaitForExitAsync() => _shutdownComplete.Task;
+    public Task WaitForExitAsync(CancellationToken cancellationToken = default)
+    {
+        return _shutdownComplete.Task.WaitAsync(cancellationToken);
+    }
 
     private void RunEventLoop()
     {
@@ -498,6 +503,7 @@ internal sealed class HakoEventLoop : IDisposable
         }
         catch
         {
+            // ignored
         }
     }
 
