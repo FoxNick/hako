@@ -491,7 +491,7 @@ internal sealed class HakoEventLoop : IDisposable
     {
         using (_runtimeLock.EnterScope())
         {
-            return _runtime;
+            return _runtime?.IsDisposed ?? true ? null : _runtime;
         }
     }
 

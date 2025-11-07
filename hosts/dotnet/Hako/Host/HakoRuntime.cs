@@ -97,6 +97,8 @@ public sealed class HakoRuntime : IDisposable
     internal HakoUtils Utils { get; }
 
     #region Disposal
+    
+    internal bool IsDisposed => _disposed;
 
     /// <summary>
     /// Disposes the runtime and all associated resources.

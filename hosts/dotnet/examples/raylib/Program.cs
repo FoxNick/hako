@@ -18,7 +18,7 @@ public class Program
     private static volatile bool _isRunning = true;
 
     [System.STAThread]
-    public static void Main(string[] args)
+    public static async Task Main(string[] args)
     {
         using var runtime = Hako.Initialize<WasmtimeEngine>();
 
@@ -34,6 +34,9 @@ public class Program
         StartScriptExecution(realm, tsCode);
         RunMainThreadLoop();
         ProcessRemainingActions();
+        
+       
+        await Hako.ShutdownAsync();
 
         Console.WriteLine("Application closed.");
     }
@@ -48,7 +51,7 @@ public class Program
                 {
                     Type = EvalType.Module,
                     FileName = ScriptFileName
-                });
+                }).Dispose();
             }
             catch (Exception ex)
             {

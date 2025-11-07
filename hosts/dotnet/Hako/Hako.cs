@@ -22,7 +22,7 @@ public static class Hako
     /// Gets the current HakoJS runtime instance.
     /// </summary>
     /// <exception cref="InvalidOperationException">No runtime has been initialized.</exception>
-    public static HakoRuntime Runtime
+    internal static HakoRuntime Runtime
     {
         get
         {
@@ -67,10 +67,11 @@ public static class Hako
             if (_runtime != null || _eventLoop != null)
                 throw new InvalidOperationException(
                     "HakoRuntime has already been initialized. Call ShutdownAsync() first.");
+          
 
             _eventLoop = new HakoEventLoop(cancellationToken: cancellationToken);
             _eventLoop.UnhandledException += OnEventLoopException;
-
+            Dispatcher.Reset();
             Dispatcher.Initialize(_eventLoop);
 
             var options = new HakoOptions<TEngine>();
@@ -90,24 +91,13 @@ public static class Hako
     /// <returns>A task that completes when the shutdown is complete.</returns>
     public static async Task ShutdownAsync(CancellationToken cancellationToken = default)
     {
-        HakoEventLoop? eventLoopToStop;
-        HakoRuntime? runtimeToDispose;
-
-        using (Lock.EnterScope())
+        if (_eventLoop != null)
         {
-            eventLoopToStop = _eventLoop;
-            runtimeToDispose = _runtime;
+            _eventLoop.UnhandledException -= OnEventLoopException;
+            await _eventLoop.StopAsync(cancellationToken).ConfigureAwait(false);
+            _eventLoop.Dispose();
         }
-
-        if (runtimeToDispose != null && eventLoopToStop != null)
-        {
-            await eventLoopToStop.InvokeAsync(() => runtimeToDispose.Dispose(), cancellationToken);
-            
-            eventLoopToStop.UnhandledException -= OnEventLoopException;
-            await eventLoopToStop.StopAsync(cancellationToken).ConfigureAwait(false);
-            eventLoopToStop.Dispose();
-        }
-        Dispatcher.Reset();
+        Dispatcher.SetOrphaned();
         using (Lock.EnterScope())
         {
             _eventLoop = null;
@@ -145,7 +135,7 @@ public static class Hako
             if (_eventLoop == eventLoop)
             {
                 _eventLoop = null;
-                Dispatcher.Reset();
+                Dispatcher.SetOrphaned();
             }
         }
     }
