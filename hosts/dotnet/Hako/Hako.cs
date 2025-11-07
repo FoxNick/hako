@@ -22,7 +22,7 @@ public static class Hako
     /// Gets the current HakoJS runtime instance.
     /// </summary>
     /// <exception cref="InvalidOperationException">No runtime has been initialized.</exception>
-    public static HakoRuntime Runtime
+    internal static HakoRuntime Runtime
     {
         get
         {
@@ -67,10 +67,11 @@ public static class Hako
             if (_runtime != null || _eventLoop != null)
                 throw new InvalidOperationException(
                     "HakoRuntime has already been initialized. Call ShutdownAsync() first.");
+          
 
             _eventLoop = new HakoEventLoop(cancellationToken: cancellationToken);
             _eventLoop.UnhandledException += OnEventLoopException;
-
+            Dispatcher.Reset();
             Dispatcher.Initialize(_eventLoop);
 
             var options = new HakoOptions<TEngine>();
@@ -86,39 +87,31 @@ public static class Hako
     /// <summary>
     /// Shuts down the HakoJS runtime and event loop asynchronously.
     /// </summary>
+    /// <param name="cancellationToken">A cancellation token to observe while waiting for shutdown to complete.</param>
     /// <returns>A task that completes when the shutdown is complete.</returns>
-    public static async Task ShutdownAsync()
+    public static async Task ShutdownAsync(CancellationToken cancellationToken = default)
     {
-        HakoEventLoop? eventLoopToStop;
-        HakoRuntime? runtimeToDispose;
-
+        if (_eventLoop != null)
+        {
+            _eventLoop.UnhandledException -= OnEventLoopException;
+            await _eventLoop.StopAsync(cancellationToken).ConfigureAwait(false);
+            _eventLoop.Dispose();
+        }
+        Dispatcher.SetOrphaned();
         using (Lock.EnterScope())
         {
-            eventLoopToStop = _eventLoop;
-            runtimeToDispose = _runtime;
             _eventLoop = null;
             _runtime = null;
-        }
-
-        if (runtimeToDispose != null && eventLoopToStop != null)
-            await eventLoopToStop.InvokeAsync(() => runtimeToDispose.Dispose());
-
-        Dispatcher.Reset();
-
-        if (eventLoopToStop != null)
-        {
-            eventLoopToStop.UnhandledException -= OnEventLoopException;
-            await eventLoopToStop.StopAsync().ConfigureAwait(false);
-            eventLoopToStop.Dispose();
         }
     }
 
     /// <summary>
     /// Waits for the event loop to exit.
     /// </summary>
+    /// <param name="cancellationToken">A cancellation token to observe while waiting for the event loop to exit.</param>
     /// <returns>A task that completes when the event loop has exited.</returns>
     /// <exception cref="InvalidOperationException">No event loop has been initialized.</exception>
-    public static Task WaitForExitAsync()
+    public static Task WaitForExitAsync(CancellationToken cancellationToken = default)
     {
         using (Lock.EnterScope())
         {
@@ -126,7 +119,7 @@ public static class Hako
                 throw new InvalidOperationException(
                     "No event loop has been initialized. Call Hako.Initialize() first.");
 
-            return _eventLoop.WaitForExitAsync();
+            return _eventLoop.WaitForExitAsync(cancellationToken);
         }
     }
 
@@ -142,7 +135,7 @@ public static class Hako
             if (_eventLoop == eventLoop)
             {
                 _eventLoop = null;
-                Dispatcher.Reset();
+                Dispatcher.SetOrphaned();
             }
         }
     }

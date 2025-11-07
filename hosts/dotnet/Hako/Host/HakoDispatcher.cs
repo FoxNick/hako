@@ -6,6 +6,7 @@ namespace HakoJS.Host;
 public sealed class HakoDispatcher
 {
     private volatile HakoEventLoop? _eventLoop;
+    private volatile bool _isOrphaned;
 
     internal HakoDispatcher()
     {
@@ -23,6 +24,16 @@ public sealed class HakoDispatcher
     internal void Reset()
     {
         _eventLoop = null;
+        _isOrphaned = false;
+    }
+
+    /// <summary>
+    /// Sets the dispatcher into orphaned mode where operations execute directly on the calling thread
+    /// instead of being marshalled to the event loop.
+    /// </summary>
+    internal void SetOrphaned()
+    {
+        _isOrphaned = true;
     }
 
     /// <summary>
@@ -31,9 +42,13 @@ public sealed class HakoDispatcher
     /// <returns>
     /// <c>true</c> if the current thread is the event loop thread; otherwise, <c>false</c>.
     /// Returns <c>false</c> if Hako has not been initialized.
+    /// In orphaned mode, always returns <c>true</c>.
     /// </returns>
     public bool CheckAccess()
     {
+        if (_isOrphaned)
+            return true;
+
         var loop = _eventLoop;
         return loop?.CheckAccess() ?? false;
     }
@@ -46,6 +61,9 @@ public sealed class HakoDispatcher
     /// </exception>
     public void VerifyAccess()
     {
+        if (_isOrphaned)
+            return;
+
         if (!CheckAccess())
             throw new InvalidOperationException(
                 "This operation must be called on the HakoJS event loop thread.");
@@ -63,6 +81,16 @@ public sealed class HakoDispatcher
     /// <exception cref="AggregateException">The action threw an exception.</exception>
     public void Invoke(Action action, CancellationToken cancellationToken = default)
     {
+        if (_isOrphaned)
+        {
+            if (action == null)
+                throw new ArgumentNullException(nameof(action));
+            
+            cancellationToken.ThrowIfCancellationRequested();
+            action();
+            return;
+        }
+
         EventLoop.Invoke(action, cancellationToken);
     }
 
@@ -80,6 +108,15 @@ public sealed class HakoDispatcher
     /// <exception cref="AggregateException">The function threw an exception.</exception>
     public T Invoke<T>(Func<T> func, CancellationToken cancellationToken = default)
     {
+        if (_isOrphaned)
+        {
+            if (func == null)
+                throw new ArgumentNullException(nameof(func));
+            
+            cancellationToken.ThrowIfCancellationRequested();
+            return func();
+        }
+
         return EventLoop.Invoke(func, cancellationToken);
     }
 
@@ -97,6 +134,25 @@ public sealed class HakoDispatcher
     /// </remarks>
     public Task InvokeAsync(Action action, CancellationToken cancellationToken = default)
     {
+        if (_isOrphaned)
+        {
+            if (action == null)
+                throw new ArgumentNullException(nameof(action));
+            
+            if (cancellationToken.IsCancellationRequested)
+                return Task.FromCanceled(cancellationToken);
+
+            try
+            {
+                action();
+                return Task.CompletedTask;
+            }
+            catch (Exception ex)
+            {
+                return Task.FromException(ex);
+            }
+        }
+
         return EventLoop.InvokeAsync(action, cancellationToken);
     }
 
@@ -115,6 +171,24 @@ public sealed class HakoDispatcher
     /// </remarks>
     public Task<T> InvokeAsync<T>(Func<T> func, CancellationToken cancellationToken = default)
     {
+        if (_isOrphaned)
+        {
+            if (func == null)
+                throw new ArgumentNullException(nameof(func));
+            
+            if (cancellationToken.IsCancellationRequested)
+                return Task.FromCanceled<T>(cancellationToken);
+
+            try
+            {
+                return Task.FromResult(func());
+            }
+            catch (Exception ex)
+            {
+                return Task.FromException<T>(ex);
+            }
+        }
+
         return EventLoop.InvokeAsync(func, cancellationToken);
     }
 
@@ -132,6 +206,24 @@ public sealed class HakoDispatcher
     /// </remarks>
     public Task InvokeAsync(Func<Task> asyncAction, CancellationToken cancellationToken = default)
     {
+        if (_isOrphaned)
+        {
+            if (asyncAction == null)
+                throw new ArgumentNullException(nameof(asyncAction));
+            
+            if (cancellationToken.IsCancellationRequested)
+                return Task.FromCanceled(cancellationToken);
+
+            try
+            {
+                return asyncAction();
+            }
+            catch (Exception ex)
+            {
+                return Task.FromException(ex);
+            }
+        }
+
         return EventLoop.InvokeAsync(asyncAction, cancellationToken);
     }
 
@@ -150,6 +242,24 @@ public sealed class HakoDispatcher
     /// </remarks>
     public Task<T> InvokeAsync<T>(Func<Task<T>> asyncFunc, CancellationToken cancellationToken = default)
     {
+        if (_isOrphaned)
+        {
+            if (asyncFunc == null)
+                throw new ArgumentNullException(nameof(asyncFunc));
+            
+            if (cancellationToken.IsCancellationRequested)
+                return Task.FromCanceled<T>(cancellationToken);
+
+            try
+            {
+                return asyncFunc();
+            }
+            catch (Exception ex)
+            {
+                return Task.FromException<T>(ex);
+            }
+        }
+
         return EventLoop.InvokeAsync(asyncFunc, cancellationToken);
     }
 
@@ -166,6 +276,23 @@ public sealed class HakoDispatcher
     /// </remarks>
     public void Post(Action action)
     {
+        if (_isOrphaned)
+        {
+            if (action == null)
+                throw new ArgumentNullException(nameof(action));
+            
+            try
+            {
+                action();
+            }
+            catch
+            {
+                // In orphaned mode, swallow exceptions for fire-and-forget operations
+                // to match the behavior of Post on the event loop
+            }
+            return;
+        }
+
         EventLoop.Post(action);
     }
     
@@ -182,6 +309,23 @@ public sealed class HakoDispatcher
     /// </remarks>
     public void Post(Func<Task> asyncAction)
     {
+        if (_isOrphaned)
+        {
+            if (asyncAction == null)
+                throw new ArgumentNullException(nameof(asyncAction));
+            
+            try
+            {
+                _ = asyncAction();
+            }
+            catch
+            {
+                // In orphaned mode, swallow exceptions for fire-and-forget operations
+                // to match the behavior of Post on the event loop
+            }
+            return;
+        }
+
         EventLoop.Post(asyncAction);
     }
 
@@ -219,6 +363,10 @@ public sealed class HakoDispatcher
     /// </remarks>
     public EventLoopYieldAwaitable Yield()
     {
+        if (_isOrphaned)
+            throw new InvalidOperationException(
+                "Cannot yield when the dispatcher is in orphaned mode.");
+
         VerifyAccess();
         return new EventLoopYieldAwaitable(EventLoop);
     }
