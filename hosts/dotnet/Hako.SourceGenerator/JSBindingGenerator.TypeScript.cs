@@ -223,32 +223,34 @@ public partial class JSBindingGenerator
         {
             var lines = classRef.TypeScriptDefinition.Split('\n');
             foreach (var line in lines)
-                if (!string.IsNullOrWhiteSpace(line))
-                {
-                    var trimmedLine = line.TrimEnd();
-                    if (trimmedLine.StartsWith("declare class "))
-                    {
-                        trimmedLine = "  export class " + trimmedLine.Substring("declare class ".Length);
-                    }
-                    else if (trimmedLine == "}")
-                    {
-                        sb.AppendLine("  }");
-                        continue;
-                    }
-                    else if (trimmedLine.StartsWith("/**") || trimmedLine.StartsWith(" *") ||
-                             trimmedLine.StartsWith(" */"))
-                    {
-                        sb.AppendLine("  " + trimmedLine);
-                        continue;
-                    }
-                    else
-                    {
-                        sb.AppendLine("  " + trimmedLine);
-                        continue;
-                    }
+            {
+                if (string.IsNullOrWhiteSpace(line))
+                    continue;
 
+                var trimmedLine = line.TrimEnd();
+
+                if (trimmedLine.StartsWith("import "))
+                    continue;
+
+                if (trimmedLine.StartsWith("declare class "))
+                {
+                    trimmedLine = "  export class " + trimmedLine.Substring("declare class ".Length);
                     sb.AppendLine(trimmedLine);
                 }
+                else if (trimmedLine == "}")
+                {
+                    sb.AppendLine("  }");
+                }
+                else if (trimmedLine.StartsWith("/**") || trimmedLine.StartsWith(" *") ||
+                         trimmedLine.StartsWith(" */"))
+                {
+                    sb.AppendLine("  " + trimmedLine);
+                }
+                else
+                {
+                    sb.AppendLine("  " + trimmedLine);
+                }
+            }
 
             if (classRef != classReferences.Last() || values.Any() || methods.Any())
                 sb.AppendLine();
