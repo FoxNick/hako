@@ -945,6 +945,7 @@ public partial class JSBindingGenerator : IIncrementalGenerator
                 SpecialType.System_Int32 or SpecialType.System_UInt32 or
                 SpecialType.System_Int64 or SpecialType.System_UInt64 or
                 SpecialType.System_Single or SpecialType.System_Double or
+                SpecialType.System_DateTime or
                 SpecialType.System_String => true,
             _ => false
         };

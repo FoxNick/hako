@@ -1017,6 +1017,11 @@ public static T[] ToArray<T>(this JSValue jsValue)
             ushort ushortValue = jsElement.IsNumber() ? (ushort)jsElement.AsNumber() : (ushort)0;
             array[i] = Unsafe.As<ushort, T>(ref ushortValue);
         }
+        else if (elementType == typeof(DateTime))
+        {
+            DateTime dateTimeValue = jsElement.IsDate() ? jsElement.AsDateTime() : default;
+            array[i] = Unsafe.As<DateTime, T>(ref dateTimeValue);
+        }
         else
         {
             throw new NotSupportedException($"Array element type {elementType.Name} is not supported. Only primitive types (string, bool, int, long, float, double, etc.) are supported. Use ToArrayOf<T>() for custom types implementing IJSMarshalable<T>.");

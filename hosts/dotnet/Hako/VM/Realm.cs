@@ -2,6 +2,7 @@ using System.Text.Json;
 using HakoJS.Exceptions;
 using HakoJS.Host;
 using HakoJS.Lifetime;
+using HakoJS.SourceGeneration;
 using HakoJS.Utils;
 
 namespace HakoJS.VM;
@@ -956,6 +957,16 @@ public sealed class Realm : IDisposable
     }
 
     /// <summary>
+    /// Creates a new JavaScript Date
+    /// </summary>
+    /// <param name="value">The source DateTime</param>
+    /// <returns>A <see cref="JSValue"/> representing the Date object.</returns>
+    public JSValue NewDate(DateTime value)
+    {
+        return _valueFactory.FromNativeValue(value);
+    }
+
+    /// <summary>
     /// Creates a new JavaScript function with a specified name.
     /// </summary>
     /// <param name="name">The function name (used for stack traces and debugging).</param>
@@ -1136,6 +1147,17 @@ public sealed class Realm : IDisposable
     {
         if (value is JSValue jsValue) return jsValue;
         return _valueFactory.FromNativeValue(value, options);
+    }
+
+    /// <summary>
+    /// Converts a marshalled .NET value to a JavaScript value
+    /// </summary>
+    /// <param name="value">The .NET value to convert.</param>
+    /// <typeparam name="TValue">The type implementing <see cref="IJSMarshalable"/></typeparam>
+    /// <returns>A <see cref="JSValue"/> representing the converted value.</returns>
+    public JSValue NewValue<TValue>(TValue value) where TValue : IJSMarshalable<TValue>
+    {
+        return value.ToJSValue(this);
     }
 
     /// <summary>

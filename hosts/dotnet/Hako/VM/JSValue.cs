@@ -207,6 +207,7 @@ public sealed class JSValue(Realm realm, int handle, ValueLifecycle lifecycle = 
             {
                 return CreateResult(AsString());
             }
+
             return type switch
             {
                 JSType.Undefined => CreateResult(default(T)!),
@@ -249,6 +250,7 @@ public sealed class JSValue(Realm realm, int handle, ValueLifecycle lifecycle = 
             NativeBox<T> ConvertObject()
             {
                 if (IsNull()) return CreateResult(default(T)!);
+                if (IsDate() && typeof(T) == typeof(DateTime)) return CreateResult(AsDateTime());
                 if (IsArray()) return CreateResult(ConvertArray());
 
                 return typeof(T) == typeof(Dictionary<string, string>)
@@ -399,6 +401,39 @@ public sealed class JSValue(Realm realm, int handle, ValueLifecycle lifecycle = 
     }
 
     /// <summary>
+    /// Checks if the value is <c>Date</c>.
+    /// </summary>
+    /// <returns><c>true</c> if the value is <c>Date</c>; otherwise, <c>false</c>.</returns>
+    /// <exception cref="HakoUseAfterFreeException">The value has been disposed.</exception>
+    public bool IsDate()
+    {
+        AssertAlive();
+        return Realm.Runtime.Registry.IsDate(_handle) is 1;
+    }
+    
+    /// <summary>
+    /// Checks if the value is <c>Map</c>.
+    /// </summary>
+    /// <returns><c>true</c> if the value is <c>Map</c>; otherwise, <c>false</c>.</returns>
+    /// <exception cref="HakoUseAfterFreeException">The value has been disposed.</exception>
+    public bool IsMap()
+    {
+        AssertAlive();
+        return Realm.Runtime.Registry.IsMap(_handle) is 1;
+    }
+    
+    /// <summary>
+    /// Checks if the value is <c>Set</c>.
+    /// </summary>
+    /// <returns><c>true</c> if the value is <c>Set</c>; otherwise, <c>false</c>.</returns>
+    /// <exception cref="HakoUseAfterFreeException">The value has been disposed.</exception>
+    public bool IsSet()
+    {
+        AssertAlive();
+        return Realm.Runtime.Registry.IsSet(_handle) is 1;
+    }
+
+    /// <summary>
     /// Checks if the value is <c>undefined</c>.
     /// </summary>
     /// <returns><c>true</c> if the value is <c>undefined</c>; otherwise, <c>false</c>.</returns>
@@ -406,7 +441,7 @@ public sealed class JSValue(Realm realm, int handle, ValueLifecycle lifecycle = 
     public bool IsUndefined()
     {
         AssertAlive();
-        return Realm.Runtime.Registry.IsUndefined(_handle) != 0;
+        return Realm.Runtime.Registry.IsUndefined(_handle) is 1;
     }
 
     /// <summary>
@@ -417,7 +452,7 @@ public sealed class JSValue(Realm realm, int handle, ValueLifecycle lifecycle = 
     public bool IsNull()
     {
         AssertAlive();
-        return Realm.Runtime.Registry.IsNull(_handle) != 0;
+        return Realm.Runtime.Registry.IsNull(_handle) is 1;
     }
 
     /// <summary>
@@ -485,7 +520,7 @@ public sealed class JSValue(Realm realm, int handle, ValueLifecycle lifecycle = 
     public bool IsArray()
     {
         AssertAlive();
-        return Realm.Runtime.Registry.IsArray(Realm.Pointer, _handle) != 0;
+        return Realm.Runtime.Registry.IsArray(Realm.Pointer, _handle) is 1;
     }
 
     /// <summary>
@@ -496,7 +531,7 @@ public sealed class JSValue(Realm realm, int handle, ValueLifecycle lifecycle = 
     public bool IsError()
     {
         AssertAlive();
-        return Realm.Runtime.Registry.IsError(Realm.Pointer, _handle) != 0;
+        return Realm.Runtime.Registry.IsError(Realm.Pointer, _handle) is 1;
     }
 
     /// <summary>
@@ -511,7 +546,7 @@ public sealed class JSValue(Realm realm, int handle, ValueLifecycle lifecycle = 
     public bool IsException()
     {
         AssertAlive();
-        return Realm.Runtime.Registry.IsException(_handle) != 0;
+        return Realm.Runtime.Registry.IsException(_handle) is 1;
     }
 
     /// <summary>
@@ -522,7 +557,7 @@ public sealed class JSValue(Realm realm, int handle, ValueLifecycle lifecycle = 
     public bool IsPromise()
     {
         AssertAlive();
-        return Realm.Runtime.Registry.IsPromise(Realm.Pointer, _handle) != 0;
+        return Realm.Runtime.Registry.IsPromise(Realm.Pointer, _handle) is 1;
     }
 
     /// <summary>
@@ -533,7 +568,7 @@ public sealed class JSValue(Realm realm, int handle, ValueLifecycle lifecycle = 
     public bool IsTypedArray()
     {
         AssertAlive();
-        return Realm.Runtime.Registry.IsTypedArray(Realm.Pointer, _handle) != 0;
+        return Realm.Runtime.Registry.IsTypedArray(Realm.Pointer, _handle) is 1;
     }
 
     /// <summary>
@@ -544,7 +579,7 @@ public sealed class JSValue(Realm realm, int handle, ValueLifecycle lifecycle = 
     public bool IsArrayBuffer()
     {
         AssertAlive();
-        return Realm.Runtime.Registry.IsArrayBuffer(_handle) != 0;
+        return Realm.Runtime.Registry.IsArrayBuffer(_handle) is 1;
     }
 
     /// <summary>
@@ -555,12 +590,55 @@ public sealed class JSValue(Realm realm, int handle, ValueLifecycle lifecycle = 
     public bool IsGlobalSymbol()
     {
         AssertAlive();
-        return Realm.Runtime.Registry.IsGlobalSymbol(Realm.Pointer, _handle) == 1;
+        return Realm.Runtime.Registry.IsGlobalSymbol(Realm.Pointer, _handle) is 1;
     }
 
     #endregion
 
     #region Type Conversion
+    
+    
+    /// <summary>
+    /// Converts a JavaScript Date object to a .NET DateTime.
+    /// </summary>
+    /// <returns>A UTC DateTime representing the Date value.</returns>
+    /// <exception cref="InvalidOperationException">The value is not a Date or has an invalid timestamp.</exception>
+    /// <exception cref="HakoUseAfterFreeException">The value has been disposed.</exception>
+    /// <remarks>
+    /// <para>
+    /// JavaScript Date objects store time as milliseconds since Unix epoch (January 1, 1970 UTC).
+    /// This method converts that to a .NET <see cref="DateTime"/> in UTC.
+    /// </para>
+    /// <para>
+    /// The returned DateTime has <see cref="DateTimeKind.Utc"/>. To convert to local time:
+    /// <code>
+    /// using var jsDate = realm.EvalCode("new Date()").Unwrap();
+    /// DateTime utc = jsDate.AsDateTime();
+    /// DateTime local = utc.ToLocalTime();
+    /// </code>
+    /// </para>
+    /// <para>
+    /// To convert to a specific timezone:
+    /// <code>
+    /// DateTime utc = jsDate.AsDateTime();
+    /// TimeZoneInfo pst = TimeZoneInfo.FindSystemTimeZoneById("Pacific Standard Time");
+    /// DateTime pstTime = TimeZoneInfo.ConvertTimeFromUtc(utc, pst);
+    /// </code>
+    /// </para>
+    /// </remarks>
+    public DateTime AsDateTime()
+    {
+        AssertAlive();
+        if (!IsDate()) 
+            throw new InvalidOperationException("Value is not a Date");
+    
+        var milliseconds = Realm.Runtime.Registry.GetDateTimestamp(Realm.Pointer, _handle);
+    
+        if (double.IsNaN(milliseconds))
+            throw new InvalidOperationException("Date has invalid timestamp (NaN)");
+    
+        return DateTimeOffset.FromUnixTimeMilliseconds((long)milliseconds).UtcDateTime;
+    }
 
     /// <summary>
     /// Converts the value to a number (double).
@@ -1269,7 +1347,7 @@ public sealed class JSValue(Realm realm, int handle, ValueLifecycle lifecycle = 
             if (error != null) throw error;
         }
 
-        return result == 1;
+        return result is 1;
     }
 
     #endregion
@@ -1440,7 +1518,7 @@ public sealed class JSValue(Realm realm, int handle, ValueLifecycle lifecycle = 
     /// </remarks>
     public bool IsNullOrUndefined()
     {
-        return Realm.Runtime.Registry.IsNullOrUndefined(_handle) != 0;
+        return Realm.Runtime.Registry.IsNullOrUndefined(_handle) is 1;
     }
 
     /// <summary>

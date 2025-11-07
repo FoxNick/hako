@@ -10,8 +10,6 @@ namespace HakoJS.SourceGenerator.Tests;
 
 public class JSBindingGeneratorTests(ITestOutputHelper output)
 {
-    // Define all the attributes and interfaces needed
-    // Replace the AttributesAndInterfacesText constant in JSBindingGeneratorTests with this:
 
 private const string AttributesAndInterfacesText = @"
 namespace HakoJS.SourceGeneration
@@ -231,9 +229,11 @@ namespace HakoJS.VM
         public bool IsTypedArray() { return false; }
         public bool IsObject() { return false; }
         public bool IsFunction() { return false; }
+        public bool IsDate() { return false; }
         public string AsString() { return ""; }
         public double AsNumber() { return 0.0; }
         public bool AsBoolean() { return false; }
+        public System.DateTime AsDateTime() { return System.DateTime.UtcNow; }
         public byte[] CopyArrayBuffer() { return new byte[0]; }
         public byte[] CopyTypedArray() { return new byte[0]; }
         public TypedArrayType GetTypedArrayType() { return TypedArrayType.Uint8Array; }
@@ -311,6 +311,7 @@ namespace HakoJS.Extensions
         public static HakoJS.VM.JSValue False(this HakoJS.VM.Realm ctx) { return new HakoJS.VM.JSValue(); }
         public static HakoJS.VM.JSValue NewString(this HakoJS.VM.Realm ctx, string value) { return new HakoJS.VM.JSValue(); }
         public static HakoJS.VM.JSValue NewNumber(this HakoJS.VM.Realm ctx, double value) { return new HakoJS.VM.JSValue(); }
+        public static HakoJS.VM.JSValue NewDate(this HakoJS.VM.Realm ctx, System.DateTime value) { return new HakoJS.VM.JSValue(); }
         public static HakoJS.VM.JSValue NewArrayBuffer(this HakoJS.VM.Realm ctx, byte[] value) { return new HakoJS.VM.JSValue(); }
         public static HakoJS.VM.JSValue NewArray(this HakoJS.VM.Realm ctx) { return new HakoJS.VM.JSValue(); }
         public static HakoJS.VM.Realm CreatePrototype<T>(this HakoJS.VM.Realm realm) where T : HakoJS.SourceGeneration.IJSBindable<T> { return realm; }
@@ -4093,5 +4094,423 @@ public partial class ProcessingOptions
 }
 #endregion
 
+#region DateTime Tests
+
+[Fact]
+public void HandlesDateTimeProperties()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+using System;
+
+namespace TestNamespace;
+
+[JSClass]
+public partial class Event
+{
+    [JSProperty]
+    public DateTime StartTime { get; set; }
+
+    [JSProperty]
+    public DateTime? EndTime { get; set; }
+
+    [JSProperty(ReadOnly = true)]
+    public DateTime CreatedAt { get; private set; }
+}
+";
+
+    var result = RunGenerator(source);
+    
+    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+    
+    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+    
+    // Should marshal DateTime using NewDate
+    Assert.Contains("ctx.NewDate(", generatedCode);
+    
+    // Should unmarshal DateTime using AsDateTime
+    Assert.Contains("AsDateTime()", generatedCode);
+    
+    // Should check IsDate for validation
+    Assert.Contains("IsDate()", generatedCode);
+}
+
+[Fact]
+public void HandlesDateTimeMethodParameters()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+using System;
+
+namespace TestNamespace;
+
+[JSClass]
+public partial class Calendar
+{
+    [JSMethod]
+    public bool IsWeekend(DateTime date) => true;
+
+    [JSMethod]
+    public void Schedule(DateTime start, DateTime? end = null) { }
+}
+";
+
+    var result = RunGenerator(source);
+    
+    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+    
+    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+    
+    // Should validate date parameter is a Date
+    Assert.Contains("IsDate()", generatedCode);
+    Assert.Contains("AsDateTime()", generatedCode);
+    Assert.Contains("\"Parameter 'date' must be a Date\"", generatedCode);
+}
+
+[Fact]
+public void HandlesDateTimeReturnTypes()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+using System;
+
+namespace TestNamespace;
+
+[JSClass]
+public partial class TimeService
+{
+    [JSMethod]
+    public DateTime Now() => DateTime.Now;
+
+    [JSMethod]
+    public DateTime? FindEvent(string name) => null;
+
+    [JSMethod(Static = true)]
+    public static DateTime GetUtcNow() => DateTime.UtcNow;
+}
+";
+
+    var result = RunGenerator(source);
+    
+    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+    
+    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+    
+    // Should marshal return values with NewDate
+    Assert.Contains("ctx.NewDate(", generatedCode);
+    
+    // Should handle nullable DateTime
+    Assert.Contains("ctx.Null()", generatedCode);
+}
+
+[Fact]
+public void HandlesDateTimeArrays()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+using System;
+
+namespace TestNamespace;
+
+[JSClass]
+public partial class EventLog
+{
+    [JSProperty]
+    public DateTime[] Timestamps { get; set; }
+
+    [JSMethod]
+    public DateTime[] GetEventTimes() => null;
+
+    [JSMethod]
+    public void ProcessDates(DateTime[] dates) { }
+}
+";
+
+    var result = RunGenerator(source);
+    
+    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+    
+    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+    
+    // Should use ToJSArray for marshaling arrays
+    Assert.Contains("ToJSArray", generatedCode);
+    
+    // Should use ToArray for unmarshaling arrays
+    Assert.Contains("ToArrayOf<global::System.DateTime>();", generatedCode);
+}
+
+[Fact]
+public void HandlesDateTimeInRecords()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+using System;
+
+namespace TestNamespace;
+
+[JSObject]
+public partial record Appointment(
+    string Title,
+    DateTime StartTime,
+    DateTime? EndTime = null
+);
+";
+
+    var result = RunGenerator(source);
+    
+    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+    
+    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+    
+    // ToJSValue should marshal DateTime
+    Assert.Contains("realm.NewDate(StartTime)", generatedCode);
+    
+    // FromJSValue should unmarshal DateTime
+    Assert.Contains("IsDate()", generatedCode);
+    Assert.Contains("AsDateTime()", generatedCode);
+}
+
+[Fact]
+public void HandlesDateTimeInModules()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+using System;
+
+namespace TestNamespace;
+
+[JSModule]
+public partial class TimeModule
+{
+    [JSModuleValue]
+    public static DateTime ServerStartTime = DateTime.Now;
+
+    [JSModuleMethod]
+    public static DateTime GetCurrentTime() => DateTime.Now;
+
+    [JSModuleMethod]
+    public static bool IsExpired(DateTime expiryDate) => false;
+}
+";
+
+    var result = RunGenerator(source);
+    
+    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+    
+    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+    
+    Assert.Contains("ctx.NewDate(", generatedCode);
+    Assert.Contains("AsDateTime()", generatedCode);
+}
+
+[Fact]
+public void GeneratesTypeScriptDateForDateTime()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+using System;
+
+namespace TestNamespace;
+
+[JSClass]
+public partial class DateHandler
+{
+    [JSProperty]
+    public DateTime Date { get; set; }
+
+    [JSProperty]
+    public DateTime? OptionalDate { get; set; }
+
+    [JSMethod]
+    public DateTime GetDate(DateTime input) => input;
+}
+";
+
+    var result = RunGenerator(source);
+    
+    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+    
+    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+    
+    // Should map DateTime to Date in TypeScript
+    Assert.Contains("date: Date;", generatedCode);
+    Assert.Contains("optionalDate: Date | null;", generatedCode);
+    Assert.Contains("getDate(input: Date): Date;", generatedCode);
+}
+
+[Fact]
+public void GeneratesTypeScriptDateArrayForDateTimeArray()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+using System;
+
+namespace TestNamespace;
+
+[JSClass]
+public partial class Timeline
+{
+    [JSProperty]
+    public DateTime[] Events { get; set; }
+
+    [JSMethod]
+    public DateTime[] GetDates() => null;
+}
+";
+
+    var result = RunGenerator(source);
+    
+    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+    
+    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+    
+    // Should map DateTime[] to Date[] in TypeScript
+    Assert.Contains("events: Date[];", generatedCode);
+    Assert.Contains("getDates(): Date[];", generatedCode);
+}
+
+[Fact]
+public void GeneratesTypeScriptDateForRecordDateTime()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+using System;
+
+namespace TestNamespace;
+
+[JSObject]
+public partial record Event(
+    string Name,
+    DateTime StartDate,
+    DateTime? EndDate = null
+);
+";
+
+    var result = RunGenerator(source);
+    
+    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+    
+    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+    
+    // Should map DateTime to Date in TypeScript interface
+    Assert.Contains("interface Event {", generatedCode);
+    Assert.Contains("name: string;", generatedCode);
+    Assert.Contains("startDate: Date;", generatedCode);
+    Assert.Contains("endDate?: Date | null;", generatedCode);
+}
+
+[Fact]
+public void GeneratesTypeScriptDateForModuleDateTime()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+using System;
+
+namespace TestNamespace;
+
+[JSModule]
+public partial class TimeModule
+{
+    [JSModuleValue]
+    public static DateTime StartTime = DateTime.Now;
+
+    [JSModuleMethod]
+    public static DateTime AddDays(DateTime date, int days) => date;
+}
+";
+
+    var result = RunGenerator(source);
+    
+    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+    
+    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+    
+    // Should map DateTime to Date in module exports
+    Assert.Contains("export const startTime: Date;", generatedCode);
+    Assert.Contains("export function addDays(date: Date, days: number): Date;", generatedCode);
+}
+
+[Fact]
+public void GeneratesTsDocForDateTimeParameters()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+using System;
+
+namespace TestNamespace;
+
+[JSClass]
+public partial class Scheduler
+{
+    /// <summary>
+    /// Checks if a date is available for booking.
+    /// </summary>
+    /// <param name=""date"">The date to check</param>
+    /// <param name=""endDate"">Optional end date for range checking</param>
+    /// <returns>True if available, false otherwise</returns>
+    [JSMethod]
+    public bool IsAvailable(DateTime date, DateTime? endDate = null) => true;
+}
+";
+
+    var result = RunGenerator(source);
+    
+    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+    
+    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+    
+    // Should have proper TSDoc with Date types
+    Assert.Contains("* Checks if a date is available for booking.", generatedCode);
+    Assert.Contains("* @param date The date to check", generatedCode);
+    Assert.Contains("* @param endDate Optional end date for range checking", generatedCode);
+    Assert.Contains("* @returns True if available, false otherwise", generatedCode);
+    Assert.Contains("isAvailable(date: Date, endDate?: Date | null): boolean;", generatedCode);
+}
+
+[Fact]
+public void HandlesMixedDateTimeAndOtherTypes()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+using System;
+
+namespace TestNamespace;
+
+[JSClass]
+public partial class Booking
+{
+    [JSProperty]
+    public string Id { get; set; }
+
+    [JSProperty]
+    public DateTime BookingDate { get; set; }
+
+    [JSProperty]
+    public int DurationMinutes { get; set; }
+
+    [JSMethod]
+    public bool Reserve(string customerId, DateTime date, int duration) => true;
+}
+";
+
+    var result = RunGenerator(source);
+    
+    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+    
+    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+    
+    // Should handle mixed types correctly
+    Assert.Contains("id: string;", generatedCode);
+    Assert.Contains("bookingDate: Date;", generatedCode);
+    Assert.Contains("durationMinutes: number;", generatedCode);
+    Assert.Contains("reserve(customerId: string, date: Date, duration: number): boolean;", generatedCode);
+    
+    // Should have proper marshaling
+    Assert.Contains("ctx.NewString(", generatedCode);
+    Assert.Contains("ctx.NewDate(", generatedCode);
+    Assert.Contains("ctx.NewNumber(", generatedCode);
+}
+
+#endregion
 
 }

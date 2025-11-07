@@ -583,26 +583,6 @@ public partial class JSBindingGenerator
 
     #region Marshaling Helpers
 
-    private static bool IsPrimitiveType(TypeInfo type)
-    {
-        return type.SpecialType switch
-        {
-            SpecialType.System_String => true,
-            SpecialType.System_Boolean => true,
-            SpecialType.System_Int32 => true,
-            SpecialType.System_Int64 => true,
-            SpecialType.System_Int16 => true,
-            SpecialType.System_Byte => true,
-            SpecialType.System_SByte => true,
-            SpecialType.System_UInt32 => true,
-            SpecialType.System_UInt64 => true,
-            SpecialType.System_UInt16 => true,
-            SpecialType.System_Double => true,
-            SpecialType.System_Single => true,
-            _ => false
-        };
-    }
-
     private static string GetTypeCheck(TypeInfo type, string jsValueName)
     {
         switch (type.SpecialType)
@@ -622,8 +602,10 @@ public partial class JSBindingGenerator
             case SpecialType.System_Double:
             case SpecialType.System_Single:
                 return $"{jsValueName}.IsNumber()";
+            case SpecialType.System_DateTime:
+                return $"{jsValueName}.IsDate()";
         }
-
+        
         if (type.FullName == "global::System.Byte[]")
             return $"({jsValueName}.IsArrayBuffer() || {jsValueName}.IsTypedArray())";
 
@@ -661,6 +643,8 @@ public partial class JSBindingGenerator
                 return $"(ulong){jsValueName}.AsNumber()";
             case SpecialType.System_UInt16:
                 return $"(ushort){jsValueName}.AsNumber()";
+            case SpecialType.System_DateTime:
+                return $"{jsValueName}.AsDateTime()";
         }
 
         if (type.FullName == "global::System.Byte[]")
@@ -710,6 +694,8 @@ public partial class JSBindingGenerator
                 return $"(ulong){jsValueName}.AsNumber()";
             case SpecialType.System_UInt16:
                 return $"(ushort){jsValueName}.AsNumber()";
+            case SpecialType.System_DateTime:
+                return $"{jsValueName}.AsDateTime()";
         }
 
         if (type.FullName == "global::System.Byte[]")
@@ -749,6 +735,8 @@ public partial class JSBindingGenerator
             case SpecialType.System_Double:
             case SpecialType.System_Single:
                 return "a number";
+            case SpecialType.System_DateTime:
+                return "a Date";
         }
 
         if (type.FullName == "global::System.Byte[]")
@@ -798,6 +786,10 @@ public partial class JSBindingGenerator
                     $"{ctxName}.NewNumber(double.IsNaN({valueName}) || double.IsInfinity({valueName}) ? 0.0 : {valueName})";
             case SpecialType.System_Void:
                 return $"{ctxName}.Undefined()";
+            
+            case SpecialType.System_DateTime:
+                return type.IsNullable ? $"({valueName}.HasValue ? {ctxName}.NewDate({valueName}.Value) : {ctxName}.Null())"
+                    : $"{ctxName}.NewDate({valueName})";
         }
 
         if (type.FullName == "global::System.Byte[]")
