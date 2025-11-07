@@ -335,6 +335,11 @@ public static class CollectionExtensions
             var ushortValue = Unsafe.As<T, ushort>(ref value);
             return realm.NewNumber(ushortValue);
         }
+        else if (elementType == typeof(DateTime))
+        {
+            var dateTimeValue = Unsafe.As<T, DateTime>(ref value);
+            return realm.NewDate(dateTimeValue);
+        }
         else
         {
             throw new NotSupportedException($"Array element type {elementType.Name} is not supported. Only primitive types (string, bool, int, long, float, double, etc.) are supported. Use ToJSArrayOf<T>() for custom types implementing IJSMarshalable<T>.");

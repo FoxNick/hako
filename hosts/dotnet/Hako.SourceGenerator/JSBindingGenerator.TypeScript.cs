@@ -437,6 +437,8 @@ public partial class JSBindingGenerator
             case SpecialType.System_Double:
             case SpecialType.System_Single:
                 return "number";
+            case SpecialType.System_DateTime:
+                return "Date";
         }
 
         if (type.FullName == "global::HakoJS.SourceGeneration.Uint8ArrayValue")
@@ -479,6 +481,7 @@ public partial class JSBindingGenerator
                 "System.UInt16" or "ushort" => "number",
                 "System.Double" or "double" => "number",
                 "System.Single" or "float" => "number",
+                "System.DateTime" or "DateTime" => "Date",
                 _ => elementTypeName.Contains('.')
                     ? elementTypeName.Substring(elementTypeName.LastIndexOf('.') + 1)
                     : elementTypeName
@@ -659,6 +662,7 @@ public partial class JSBindingGenerator
             "System.Double" or "double" => true,
             "System.Single" or "float" => true,
             "System.Void" or "void" => true,
+            "System.DateTime" or "DateTime" => true,
             _ => false
         };
     }
