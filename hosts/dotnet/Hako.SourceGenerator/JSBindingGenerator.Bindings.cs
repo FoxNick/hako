@@ -554,7 +554,8 @@ public partial class JSBindingGenerator
             foreach (var className in sortedClasses)
             {
                 var classRef = model.ClassReferences.First(c => c.SimpleName == className);
-                sb.AppendLine($"            var {ToCamelCase(classRef.SimpleName)}Class = realm.CreatePrototype<{classRef.FullTypeName}>();");
+                sb.AppendLine(
+                    $"            var {ToCamelCase(classRef.SimpleName)}Class = realm.CreatePrototype<{classRef.FullTypeName}>();");
             }
 
             if (model.Values.Any() || model.Methods.Any())
@@ -591,6 +592,7 @@ public partial class JSBindingGenerator
         allExports.AddRange(model.Values.Select(v => v.JsName));
         allExports.AddRange(model.Methods.Select(m => m.JsName));
         allExports.AddRange(model.ClassReferences.Select(c => c.ExportName));
+        allExports.AddRange(model.InterfaceReferences.Select(i => i.ExportName));
 
         sb.AppendLine(allExports.Any()
             ? $"            .AddExports({string.Join(", ", allExports.Select(e => $"\"{e}\""))});"
@@ -716,7 +718,8 @@ public partial class JSBindingGenerator
         return true;
     }
 
-    private static HashSet<string> ExtractTypeDependencies(ModuleClassReference classRef, ImmutableHashSet<string> classNames)
+    private static HashSet<string> ExtractTypeDependencies(ModuleClassReference classRef,
+        ImmutableHashSet<string> classNames)
     {
         var dependencies = new HashSet<string>();
 

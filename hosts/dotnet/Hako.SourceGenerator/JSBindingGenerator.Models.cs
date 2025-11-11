@@ -57,6 +57,7 @@ public partial class JSBindingGenerator
         public List<ModuleValueModel> Values { get; set; } = new();
         public List<ModuleMethodModel> Methods { get; set; } = new();
         public List<ModuleClassReference> ClassReferences { get; set; } = new();
+        public List<ModuleInterfaceReference> InterfaceReferences { get; set; } = new();
         public string TypeScriptDefinition { get; set; } = "";
         public string? Documentation { get; set; }
     }
@@ -154,6 +155,16 @@ public partial class JSBindingGenerator
         public List<MethodModel> Methods { get; set; } = new();
     }
 
+    private class ModuleInterfaceReference
+    {
+        public string FullTypeName { get; set; } = "";
+        public string SimpleName { get; set; } = "";
+        public string ExportName { get; set; } = "";
+        public string TypeScriptDefinition { get; set; } = "";
+        public string? Documentation { get; set; }
+        public List<RecordParameterModel> Parameters { get; set; } = new();
+    }
+
     private class ParameterModel
     {
         public string Name { get; set; } = "";
@@ -161,7 +172,7 @@ public partial class JSBindingGenerator
         public bool IsOptional { get; set; }
         public string? DefaultValue { get; set; }
         public string? Documentation { get; set; }
-        
+
         public bool IsDelegate { get; set; }
         public DelegateInfo? DelegateInfo { get; set; }
     }

@@ -70,6 +70,13 @@ namespace HakoJS.SourceGeneration
         public string? ExportName { get; set; }
     }
 
+    [System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = true)]
+    public class JSModuleInterfaceAttribute : System.Attribute
+    {
+        public System.Type? InterfaceType { get; set; }
+        public string? ExportName { get; set; }
+    }
+
     [System.AttributeUsage(System.AttributeTargets.Class, Inherited = false)]
     public class JSObjectAttribute : System.Attribute
     {
@@ -4509,6 +4516,665 @@ public partial class Booking
     Assert.Contains("ctx.NewString(", generatedCode);
     Assert.Contains("ctx.NewDate(", generatedCode);
     Assert.Contains("ctx.NewNumber(", generatedCode);
+}
+
+#endregion
+
+#region JSModuleInterface Tests
+
+[Fact]
+public void GeneratesModuleWithInterface()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+
+namespace TestNamespace;
+
+[JSObject]
+public partial record Config(string Name, int Port);
+
+[JSModule(Name = ""myModule"")]
+[JSModuleInterface(InterfaceType = typeof(Config), ExportName = ""Config"")]
+public partial class MyModule
+{
+    [JSModuleValue]
+    public static string Version = ""1.0.0"";
+}
+";
+
+    var result = RunGenerator(source);
+    
+    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+    
+    var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
+    
+    // Should include interface in module declaration
+    Assert.Contains("declare module 'myModule' {", moduleCode);
+    Assert.Contains("export interface Config {", moduleCode);
+    Assert.Contains("name: string;", moduleCode);
+    Assert.Contains("port: number;", moduleCode);
+    Assert.Contains("export const version: string;", moduleCode);
+}
+
+[Fact]
+public void GeneratesModuleWithMultipleInterfaces()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+
+namespace TestNamespace;
+
+[JSObject]
+public partial record UserProfile(string Name, string Email);
+
+[JSObject]
+public partial record Settings(bool DarkMode, string Language);
+
+[JSModule]
+[JSModuleInterface(InterfaceType = typeof(UserProfile))]
+[JSModuleInterface(InterfaceType = typeof(Settings))]
+public partial class AppModule
+{
+}
+";
+
+    var result = RunGenerator(source);
+    
+    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+    
+    var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
+    
+    // Should include both interfaces
+    Assert.Contains("export interface UserProfile {", moduleCode);
+    Assert.Contains("name: string;", moduleCode);
+    Assert.Contains("email: string;", moduleCode);
+    
+    Assert.Contains("export interface Settings {", moduleCode);
+    Assert.Contains("darkMode: boolean;", moduleCode);
+    Assert.Contains("language: string;", moduleCode);
+}
+
+[Fact]
+public void GeneratesModuleWithBothClassAndInterface()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+
+namespace TestNamespace;
+
+[JSClass]
+public partial class MyClass
+{
+    [JSProperty]
+    public string Name { get; set; }
+}
+
+[JSObject]
+public partial record MyInterface(int Id, string Value);
+
+[JSModule]
+[JSModuleClass(ClassType = typeof(MyClass))]
+[JSModuleInterface(InterfaceType = typeof(MyInterface))]
+public partial class MyModule
+{
+    [JSModuleMethod]
+    public static int Add(int a, int b) => a + b;
+}
+";
+
+    var result = RunGenerator(source);
+    
+    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+    
+    var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
+    
+    // Should include both class and interface
+    Assert.Contains("export class MyClass {", moduleCode);
+    Assert.Contains("constructor();", moduleCode);
+    Assert.Contains("name: string;", moduleCode);
+    
+    Assert.Contains("export interface MyInterface {", moduleCode);
+    Assert.Contains("id: number;", moduleCode);
+    Assert.Contains("value: string;", moduleCode);
+    
+    Assert.Contains("export function add(a: number, b: number): number;", moduleCode);
+}
+
+[Fact]
+public void AddsInterfaceToModuleExports()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+
+namespace TestNamespace;
+
+[JSObject]
+public partial record Config(string Name);
+
+[JSModule]
+[JSModuleInterface(InterfaceType = typeof(Config), ExportName = ""Config"")]
+public partial class MyModule
+{
+    [JSModuleValue]
+    public static string Version = ""1.0.0"";
+}
+";
+
+    var result = RunGenerator(source);
+    
+    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+    
+    var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
+    
+    // Should add interface name to exports list
+    Assert.Contains(".AddExports(\"version\", \"Config\")", moduleCode);
+}
+
+[Fact]
+public void UsesCustomExportNameForInterface()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+
+namespace TestNamespace;
+
+[JSObject]
+public partial record UserProfile(string Name);
+
+[JSModule]
+[JSModuleInterface(InterfaceType = typeof(UserProfile), ExportName = ""Profile"")]
+public partial class MyModule
+{
+}
+";
+
+    var result = RunGenerator(source);
+    
+    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+    
+    var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
+    
+    // Should use custom export name
+    Assert.Contains("export interface Profile {", moduleCode);
+    Assert.Contains(".AddExports(\"Profile\")", moduleCode);
+}
+
+[Fact]
+public void ReportsErrorForInvalidModuleInterface()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+
+namespace TestNamespace;
+
+// Not a JSObject
+public partial record InvalidRecord(string Name);
+
+[JSModule]
+[JSModuleInterface(InterfaceType = typeof(InvalidRecord))]
+public partial class MyModule
+{
+}
+";
+
+    var result = RunGenerator(source);
+    
+    var error = result.Diagnostics.FirstOrDefault(d => d.Id == "HAKO020");
+    Assert.NotNull(error);
+    Assert.Equal(DiagnosticSeverity.Error, error.Severity);
+    Assert.Contains("does not have the [JSObject] attribute", error.GetMessage());
+}
+
+[Fact]
+public void ReportsErrorForInterfaceInMultipleModules()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+
+namespace TestNamespace;
+
+[JSObject]
+public partial record SharedConfig(string Name);
+
+[JSModule(Name = ""module1"")]
+[JSModuleInterface(InterfaceType = typeof(SharedConfig))]
+public partial class Module1
+{
+}
+
+[JSModule(Name = ""module2"")]
+[JSModuleInterface(InterfaceType = typeof(SharedConfig))]
+public partial class Module2
+{
+}
+";
+
+    var result = RunGenerator(source);
+    
+    var error = result.Diagnostics.FirstOrDefault(d => d.Id == "HAKO021");
+    Assert.NotNull(error);
+    Assert.Equal(DiagnosticSeverity.Error, error.Severity);
+    Assert.Contains("referenced by multiple modules", error.GetMessage());
+}
+
+[Fact]
+public void ReportsErrorForDuplicateInterfaceExportName()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+
+namespace TestNamespace;
+
+[JSObject]
+public partial record Config1(string Name);
+
+[JSObject]
+public partial record Config2(int Value);
+
+[JSModule]
+[JSModuleInterface(InterfaceType = typeof(Config1), ExportName = ""Config"")]
+[JSModuleInterface(InterfaceType = typeof(Config2), ExportName = ""Config"")]
+public partial class MyModule
+{
+}
+";
+
+    var result = RunGenerator(source);
+    
+    var error = result.Diagnostics.FirstOrDefault(d => d.Id == "HAKO011");
+    Assert.NotNull(error);
+    Assert.Equal(DiagnosticSeverity.Error, error.Severity);
+    Assert.Contains("Export names must be unique", error.GetMessage());
+}
+
+[Fact]
+public void ReportsErrorForInterfaceNameConflictWithMethod()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+
+namespace TestNamespace;
+
+[JSObject]
+public partial record Config(string Name);
+
+[JSModule]
+[JSModuleInterface(InterfaceType = typeof(Config), ExportName = ""getData"")]
+public partial class MyModule
+{
+    [JSModuleMethod(Name = ""getData"")]
+    public static string GetData() => ""data"";
+}
+";
+
+    var result = RunGenerator(source);
+    
+    var error = result.Diagnostics.FirstOrDefault(d => d.Id == "HAKO011");
+    Assert.NotNull(error);
+    Assert.Contains("Export names must be unique", error.GetMessage());
+}
+
+[Fact]
+public void GeneratesModuleInterfaceWithOptionalParameters()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+
+namespace TestNamespace;
+
+[JSObject]
+public partial record Config(
+    string Name,
+    int Port = 8080,
+    string? Host = null
+);
+
+[JSModule]
+[JSModuleInterface(InterfaceType = typeof(Config))]
+public partial class MyModule
+{
+}
+";
+
+    var result = RunGenerator(source);
+    
+    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+    
+    var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
+    
+    Assert.Contains("export interface Config {", moduleCode);
+    Assert.Contains("name: string;", moduleCode);
+    Assert.Contains("port?: number;", moduleCode);
+    Assert.Contains("host?: string | null;", moduleCode);
+}
+
+[Fact]
+public void GeneratesModuleInterfaceWithDelegates()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+using System;
+
+namespace TestNamespace;
+
+[JSObject]
+public partial record EventConfig(
+    string EventName,
+    Action<string> OnEvent,
+    Func<int, bool> Validator
+);
+
+[JSModule]
+[JSModuleInterface(InterfaceType = typeof(EventConfig))]
+public partial class MyModule
+{
+}
+";
+
+    var result = RunGenerator(source);
+    
+    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+    
+    var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
+    
+    Assert.Contains("export interface EventConfig {", moduleCode);
+    Assert.Contains("eventName: string;", moduleCode);
+    Assert.Contains("onEvent: (arg0: string) => void;", moduleCode);
+    Assert.Contains("validator: (arg0: number) => boolean;", moduleCode);
+}
+
+[Fact]
+public void GeneratesModuleInterfaceWithCustomPropertyNames()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+
+namespace TestNamespace;
+
+[JSObject]
+public partial record ApiRequest(
+    [JSPropertyName(""api_key"")] string ApiKey,
+    [JSPropertyName(""user_id"")] int UserId
+);
+
+[JSModule]
+[JSModuleInterface(InterfaceType = typeof(ApiRequest))]
+public partial class ApiModule
+{
+}
+";
+
+    var result = RunGenerator(source);
+    
+    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+    
+    var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
+    
+    Assert.Contains("export interface ApiRequest {", moduleCode);
+    Assert.Contains("api_key: string;", moduleCode);
+    Assert.Contains("user_id: number;", moduleCode);
+}
+
+[Fact]
+public void GeneratesModuleInterfaceWithArrayTypes()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+
+namespace TestNamespace;
+
+[JSObject]
+public partial record DataSet(
+    int[] Numbers,
+    string[] Tags,
+    byte[] Buffer
+);
+
+[JSModule]
+[JSModuleInterface(InterfaceType = typeof(DataSet))]
+public partial class DataModule
+{
+}
+";
+
+    var result = RunGenerator(source);
+    
+    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+    
+    var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
+    
+    Assert.Contains("export interface DataSet {", moduleCode);
+    Assert.Contains("numbers: number[];", moduleCode);
+    Assert.Contains("tags: string[];", moduleCode);
+    Assert.Contains("buffer: ArrayBuffer;", moduleCode);
+}
+
+[Fact]
+public void GeneratesModuleInterfaceWithDocumentation()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+
+namespace TestNamespace;
+
+/// <summary>
+/// Configuration settings for the application.
+/// </summary>
+/// <param name=""Name"">The application name</param>
+/// <param name=""Port"">The server port</param>
+[JSObject]
+public partial record AppConfig(string Name, int Port);
+
+/// <summary>
+/// Application configuration module.
+/// </summary>
+[JSModule]
+[JSModuleInterface(InterfaceType = typeof(AppConfig))]
+public partial class ConfigModule
+{
+}
+";
+
+    var result = RunGenerator(source);
+    
+    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+    
+    var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
+    
+    // Should include interface documentation
+    Assert.Contains("* Configuration settings for the application.", moduleCode);
+    Assert.Contains("export interface AppConfig {", moduleCode);
+    Assert.Contains("* The application name", moduleCode);
+    Assert.Contains("name: string;", moduleCode);
+    Assert.Contains("* The server port", moduleCode);
+    Assert.Contains("port: number;", moduleCode);
+}
+
+[Fact]
+public void GeneratesModuleWithInterfaceOrderedBeforeValues()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+
+namespace TestNamespace;
+
+[JSClass]
+public partial class MyClass
+{
+    [JSProperty]
+    public string Name { get; set; }
+}
+
+[JSObject]
+public partial record MyInterface(string Value);
+
+[JSModule]
+[JSModuleClass(ClassType = typeof(MyClass))]
+[JSModuleInterface(InterfaceType = typeof(MyInterface))]
+public partial class MyModule
+{
+    [JSModuleValue]
+    public static string Version = ""1.0.0"";
+    
+    [JSModuleMethod]
+    public static void DoSomething() { }
+}
+";
+
+    var result = RunGenerator(source);
+    
+    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+    
+    var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
+    
+    // Check the order: classes, then interfaces, then values, then methods
+    var classPos = moduleCode.IndexOf("export class MyClass");
+    var interfacePos = moduleCode.IndexOf("export interface MyInterface");
+    var valuePos = moduleCode.IndexOf("export const version");
+    var methodPos = moduleCode.IndexOf("export function doSomething");
+    
+    Assert.True(classPos < interfacePos, "Class should come before interface");
+    Assert.True(interfacePos < valuePos, "Interface should come before values");
+    Assert.True(valuePos < methodPos, "Values should come before methods");
+}
+
+[Fact]
+public void InterfaceDoesNotRequireRuntimeRegistration()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+
+namespace TestNamespace;
+
+[JSObject]
+public partial record Config(string Name);
+
+[JSModule]
+[JSModuleInterface(InterfaceType = typeof(Config))]
+public partial class MyModule
+{
+}
+";
+
+    var result = RunGenerator(source);
+    
+    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+    
+    var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
+    
+    // Should not have any CreatePrototype or CompleteClassExport calls for interfaces
+    Assert.DoesNotContain("realm.CreatePrototype<TestNamespace.Config>", moduleCode);
+    Assert.DoesNotContain("CompleteClassExport", moduleCode);
+    
+    // But should still be in exports list
+    Assert.Contains(".AddExports(\"Config\")", moduleCode);
+}
+
+[Fact]
+public void GeneratesComplexModuleWithMixedExports()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+using System.Threading.Tasks;
+
+namespace TestNamespace;
+
+[JSClass]
+public partial class Logger
+{
+    [JSProperty]
+    public string Name { get; set; }
+    
+    [JSMethod]
+    public void Log(string message) { }
+}
+
+[JSObject]
+public partial record LogConfig(
+    string Level,
+    bool Timestamps = true
+);
+
+[JSObject]
+public partial record LogEntry(
+    string Message,
+    string Level,
+    System.DateTime Timestamp
+);
+
+/// <summary>
+/// Logging utilities module.
+/// </summary>
+[JSModule(Name = ""logging"")]
+[JSModuleClass(ClassType = typeof(Logger), ExportName = ""Logger"")]
+[JSModuleInterface(InterfaceType = typeof(LogConfig), ExportName = ""LogConfig"")]
+[JSModuleInterface(InterfaceType = typeof(LogEntry), ExportName = ""LogEntry"")]
+public partial class LoggingModule
+{
+    /// <summary>
+    /// Default log level.
+    /// </summary>
+    [JSModuleValue]
+    public static string DefaultLevel = ""info"";
+    
+    /// <summary>
+    /// Configures the logging system.
+    /// </summary>
+    /// <param name=""config"">The configuration settings</param>
+    [JSModuleMethod]
+    public static void Configure(LogConfig config) { }
+    
+    /// <summary>
+    /// Gets recent log entries.
+    /// </summary>
+    /// <param name=""count"">Number of entries to retrieve</param>
+    /// <returns>Array of log entries</returns>
+    [JSModuleMethod]
+    public static async Task<LogEntry[]> GetRecent(int count)
+    {
+        await Task.CompletedTask;
+        return null;
+    }
+}
+";
+
+    var result = RunGenerator(source);
+    
+    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+    
+    var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
+    
+    // Should have module declaration with all exports
+    Assert.Contains("declare module 'logging' {", moduleCode);
+    
+    // Class export
+    Assert.Contains("export class Logger {", moduleCode);
+    Assert.Contains("name: string;", moduleCode);
+    Assert.Contains("log(message: string): void;", moduleCode);
+    
+    // Interface exports
+    Assert.Contains("export interface LogConfig {", moduleCode);
+    Assert.Contains("level: string;", moduleCode);
+    Assert.Contains("timestamps?: boolean;", moduleCode);
+    
+    Assert.Contains("export interface LogEntry {", moduleCode);
+    Assert.Contains("message: string;", moduleCode);
+    Assert.Contains("level: string;", moduleCode);
+    Assert.Contains("timestamp: Date;", moduleCode);
+    
+    // Value export
+    Assert.Contains("* Default log level.", moduleCode);
+    Assert.Contains("export const defaultLevel: string;", moduleCode);
+    
+    // Method exports
+    Assert.Contains("* Configures the logging system.", moduleCode);
+    Assert.Contains("export function configure(config: LogConfig): void;", moduleCode);
+    
+    Assert.Contains("* Gets recent log entries.", moduleCode);
+    Assert.Contains("export function getRecent(count: number): Promise<LogEntry[]>;", moduleCode);
+    
+    // All exports in AddExports
+    Assert.Contains(".AddExports(\"defaultLevel\", \"configure\", \"getRecent\", \"Logger\", \"LogConfig\", \"LogEntry\")", moduleCode);
 }
 
 #endregion

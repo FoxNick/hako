@@ -189,6 +189,7 @@ public partial class JSBindingGenerator
         List<ModuleValueModel> values,
         List<ModuleMethodModel> methods,
         List<ModuleClassReference> classReferences,
+        List<ModuleInterfaceReference> interfaceReferences,
         string? moduleDocumentation = null)
     {
         var sb = new StringBuilder();
@@ -209,6 +210,9 @@ public partial class JSBindingGenerator
 
         foreach (var classRef in classReferences)
             dependencies.Remove(classRef.SimpleName);
+
+        foreach (var interfaceRef in interfaceReferences)
+            dependencies.Remove(interfaceRef.SimpleName);
 
         var imports = GenerateImportStatements(dependencies, moduleName);
         if (!string.IsNullOrEmpty(imports))
@@ -252,7 +256,45 @@ public partial class JSBindingGenerator
                 }
             }
 
-            if (classRef != classReferences.Last() || values.Any() || methods.Any())
+            if (classRef != classReferences.Last() || interfaceReferences.Any() || values.Any() || methods.Any())
+                sb.AppendLine();
+        }
+
+        foreach (var interfaceRef in interfaceReferences)
+        {
+            var lines = interfaceRef.TypeScriptDefinition.Split('\n');
+            foreach (var line in lines)
+            {
+                if (string.IsNullOrWhiteSpace(line))
+                    continue;
+
+                var trimmedLine = line.TrimEnd();
+
+                if (trimmedLine.StartsWith("import "))
+                    continue;
+
+                if (trimmedLine.StartsWith("interface "))
+                {
+                    var interfaceName = interfaceRef.ExportName;
+                    trimmedLine = $"  export interface {interfaceName} {{";
+                    sb.AppendLine(trimmedLine);
+                }
+                else if (trimmedLine == "}")
+                {
+                    sb.AppendLine("  }");
+                }
+                else if (trimmedLine.StartsWith("/**") || trimmedLine.StartsWith(" *") ||
+                         trimmedLine.StartsWith(" */"))
+                {
+                    sb.AppendLine("  " + trimmedLine);
+                }
+                else
+                {
+                    sb.AppendLine("  " + trimmedLine);
+                }
+            }
+
+            if (interfaceRef != interfaceReferences.Last() || values.Any() || methods.Any())
                 sb.AppendLine();
         }
 

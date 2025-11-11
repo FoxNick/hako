@@ -49,23 +49,44 @@ public partial class JSBindingGenerator : IIncrementalGenerator
             TypeDependencies.Clear();
 
             foreach (var module in modules)
-            foreach (var classRef in module.ClassReferences)
-                TypeDependencies[classRef.SimpleName] = new TypeDependency
-                {
-                    TypeName = classRef.SimpleName,
-                    ModuleName = module.ModuleName,
-                    IsFromModule = true
-                };
+            {
+                foreach (var classRef in module.ClassReferences)
+                    TypeDependencies[classRef.SimpleName] = new TypeDependency
+                    {
+                        TypeName = classRef.SimpleName,
+                        ModuleName = module.ModuleName,
+                        IsFromModule = true
+                    };
+
+                foreach (var interfaceRef in module.InterfaceReferences)
+                    TypeDependencies[interfaceRef.SimpleName] = new TypeDependency
+                    {
+                        TypeName = interfaceRef.SimpleName,
+                        ModuleName = module.ModuleName,
+                        IsFromModule = true
+                    };
+            }
 
             var classToModules = new Dictionary<string, List<(string ModuleName, Location Location)>>();
+            var interfaceToModules = new Dictionary<string, List<(string ModuleName, Location Location)>>();
 
             foreach (var module in modules)
-            foreach (var classRef in module.ClassReferences)
             {
-                if (!classToModules.ContainsKey(classRef.FullTypeName))
-                    classToModules[classRef.FullTypeName] = new List<(string, Location)>();
+                foreach (var classRef in module.ClassReferences)
+                {
+                    if (!classToModules.ContainsKey(classRef.FullTypeName))
+                        classToModules[classRef.FullTypeName] = new List<(string, Location)>();
 
-                classToModules[classRef.FullTypeName].Add((module.ClassName, module.Location));
+                    classToModules[classRef.FullTypeName].Add((module.ClassName, module.Location));
+                }
+
+                foreach (var interfaceRef in module.InterfaceReferences)
+                {
+                    if (!interfaceToModules.ContainsKey(interfaceRef.FullTypeName))
+                        interfaceToModules[interfaceRef.FullTypeName] = new List<(string, Location)>();
+
+                    interfaceToModules[interfaceRef.FullTypeName].Add((module.ClassName, module.Location));
+                }
             }
 
             foreach (var kvp in classToModules)
@@ -84,12 +105,31 @@ public partial class JSBindingGenerator : IIncrementalGenerator
                     }
                 }
 
+            foreach (var kvp in interfaceToModules)
+                if (kvp.Value.Count > 1)
+                {
+                    var firstModule = kvp.Value[0].ModuleName;
+                    for (var i = 1; i < kvp.Value.Count; i++)
+                    {
+                        var diagnostic = Diagnostic.Create(
+                            DuplicateModuleInterfaceError,
+                            kvp.Value[i].Location,
+                            kvp.Key,
+                            firstModule,
+                            kvp.Value[i].ModuleName);
+                        ctx.ReportDiagnostic(diagnostic);
+                    }
+                }
+
             foreach (var module in modules)
             {
-                var hasErrors = module.ClassReferences.Any(c =>
+                var hasClassErrors = module.ClassReferences.Any(c =>
                     classToModules.TryGetValue(c.FullTypeName, out var moduleList) && moduleList.Count > 1);
 
-                if (!hasErrors)
+                var hasInterfaceErrors = module.InterfaceReferences.Any(i =>
+                    interfaceToModules.TryGetValue(i.FullTypeName, out var moduleList) && moduleList.Count > 1);
+
+                if (!hasClassErrors && !hasInterfaceErrors)
                     GenerateModuleSource(ctx, module);
             }
         });
@@ -214,6 +254,17 @@ public partial class JSBindingGenerator : IIncrementalGenerator
         "Parameter '{0}' in record '{1}' has type '{2}' which cannot be marshaled to JavaScript. Only primitive types, byte[], arrays of primitives, delegates, and types implementing IJSMarshalable<T> are supported.",
         "HakoJS.SourceGenerator", DiagnosticSeverity.Error, true);
 
+    private static readonly DiagnosticDescriptor InvalidModuleInterfaceError = new(
+        "HAKO020", "Invalid module interface reference",
+        "Type '{0}' referenced in [JSModuleInterface] does not have the [JSObject] attribute or is not a record type",
+        "HakoJS.SourceGenerator", DiagnosticSeverity.Error, true);
+
+
+    private static readonly DiagnosticDescriptor DuplicateModuleInterfaceError = new(
+        "HAKO021", "Interface used in multiple modules",
+        "Interface '{0}' is referenced by multiple modules ('{1}' and '{2}'). An interface can only belong to one module.",
+        "HakoJS.SourceGenerator", DiagnosticSeverity.Error, true);
+
     #endregion
 
     #region Model Extraction Methods
@@ -248,7 +299,9 @@ public partial class JSBindingGenerator : IIncrementalGenerator
         var model = new ClassModel
         {
             ClassName = classSymbol.Name,
-            SourceNamespace = classSymbol.ContainingNamespace.IsGlobalNamespace ? string.Empty : classSymbol.ContainingNamespace.ToDisplayString(),
+            SourceNamespace = classSymbol.ContainingNamespace.IsGlobalNamespace
+                ? string.Empty
+                : classSymbol.ContainingNamespace.ToDisplayString(),
             JsClassName = jsClassName,
             Constructor = constructor,
             Properties = properties,
@@ -280,25 +333,30 @@ public partial class JSBindingGenerator : IIncrementalGenerator
         var values = FindModuleValues(classSymbol, moduleName, diagnostics);
         var methods = FindModuleMethods(classSymbol, moduleName, diagnostics);
         var classReferences = FindModuleClassReferences(classSymbol, diagnostics);
+        var interfaceReferences = FindModuleInterfaceReferences(classSymbol, diagnostics);
 
-        ValidateModuleExports(moduleName, location, values, methods, classReferences, diagnostics);
+        ValidateModuleExports(moduleName, location, values, methods, classReferences, interfaceReferences, diagnostics);
 
         if (diagnostics.Count > 0)
             return new ModuleResult(null, diagnostics.ToImmutable());
 
         var documentation = ExtractXmlDocumentation(classSymbol);
         var typeScriptDefinition =
-            GenerateModuleTypeScriptDefinition(moduleName, values, methods, classReferences, documentation);
+            GenerateModuleTypeScriptDefinition(moduleName, values, methods, classReferences, interfaceReferences,
+                documentation);
 
         var model = new ModuleModel
         {
             ClassName = classSymbol.Name,
-            SourceNamespace = classSymbol.ContainingNamespace.IsGlobalNamespace ? string.Empty : classSymbol.ContainingNamespace.ToDisplayString(),
+            SourceNamespace = classSymbol.ContainingNamespace.IsGlobalNamespace
+                ? string.Empty
+                : classSymbol.ContainingNamespace.ToDisplayString(),
             ModuleName = moduleName,
             Location = location,
             Values = values,
             Methods = methods,
             ClassReferences = classReferences,
+            InterfaceReferences = interfaceReferences,
             TypeScriptDefinition = typeScriptDefinition,
             Documentation = documentation
         };
@@ -343,7 +401,9 @@ public partial class JSBindingGenerator : IIncrementalGenerator
         var model = new ObjectModel
         {
             TypeName = typeSymbol.Name,
-            SourceNamespace = typeSymbol.ContainingNamespace.IsGlobalNamespace ? string.Empty : typeSymbol.ContainingNamespace.ToDisplayString(),
+            SourceNamespace = typeSymbol.ContainingNamespace.IsGlobalNamespace
+                ? string.Empty
+                : typeSymbol.ContainingNamespace.ToDisplayString(),
             Parameters = parameters,
             TypeScriptDefinition = typeScriptDefinition,
             Documentation = documentation
@@ -386,7 +446,9 @@ public partial class JSBindingGenerator : IIncrementalGenerator
         var model = new MarshalableModel
         {
             TypeName = symbol.Name,
-            SourceNamespace = symbol.ContainingNamespace.IsGlobalNamespace ? string.Empty : symbol.ContainingNamespace.ToDisplayString(),
+            SourceNamespace = symbol.ContainingNamespace.IsGlobalNamespace
+                ? string.Empty
+                : symbol.ContainingNamespace.ToDisplayString(),
             Properties = properties,
             TypeScriptDefinition = typeScriptDefinition,
             Documentation = documentation,
@@ -762,6 +824,58 @@ public partial class JSBindingGenerator : IIncrementalGenerator
         return references;
     }
 
+    private static List<ModuleInterfaceReference> FindModuleInterfaceReferences(INamedTypeSymbol classSymbol,
+        ImmutableArray<Diagnostic>.Builder diagnostics)
+    {
+        var references = new List<ModuleInterfaceReference>();
+        var location = classSymbol.Locations.FirstOrDefault() ?? Location.None;
+
+        foreach (var attr in classSymbol.GetAttributes())
+        {
+            if (attr.AttributeClass?.Name != "JSModuleInterfaceAttribute")
+                continue;
+
+            INamedTypeSymbol? interfaceType = null;
+            string? exportName = null;
+
+            foreach (var arg in attr.NamedArguments)
+                if (arg is { Key: "InterfaceType", Value.Value: INamedTypeSymbol type })
+                    interfaceType = type;
+                else if (arg is { Key: "ExportName", Value.Value: string name })
+                    exportName = name;
+
+            if (interfaceType == null)
+                continue;
+
+            if (!HasAttribute(interfaceType, "HakoJS.SourceGeneration.JSObjectAttribute"))
+            {
+                diagnostics.Add(Diagnostic.Create(InvalidModuleInterfaceError, location,
+                    interfaceType.ToDisplayString()));
+                continue;
+            }
+
+            exportName ??= interfaceType.Name;
+
+            var parameters = FindRecordParameters(interfaceType, ImmutableArray.CreateBuilder<Diagnostic>());
+            var documentation = ExtractXmlDocumentation(interfaceType);
+
+            var interfaceTypeScriptDef = GenerateObjectTypeScriptDefinition(
+                interfaceType.Name, parameters, documentation);
+
+            references.Add(new ModuleInterfaceReference
+            {
+                FullTypeName = interfaceType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+                SimpleName = interfaceType.Name,
+                ExportName = exportName,
+                TypeScriptDefinition = interfaceTypeScriptDef,
+                Documentation = documentation,
+                Parameters = parameters
+            });
+        }
+
+        return references;
+    }
+
     private static List<RecordParameterModel> FindRecordParameters(INamedTypeSymbol typeSymbol,
         ImmutableArray<Diagnostic>.Builder diagnostics)
     {
@@ -819,7 +933,8 @@ public partial class JSBindingGenerator : IIncrementalGenerator
 
     private static void ValidateModuleExports(string moduleName, Location location,
         List<ModuleValueModel> values, List<ModuleMethodModel> methods,
-        List<ModuleClassReference> classReferences, ImmutableArray<Diagnostic>.Builder diagnostics)
+        List<ModuleClassReference> classReferences, List<ModuleInterfaceReference> interfaceReferences,
+        ImmutableArray<Diagnostic>.Builder diagnostics)
     {
         var exportNames = new Dictionary<string, string>();
 
@@ -841,6 +956,13 @@ public partial class JSBindingGenerator : IIncrementalGenerator
                     classRef.ExportName));
             else
                 exportNames[classRef.ExportName] = classRef.SimpleName;
+
+        foreach (var interfaceRef in interfaceReferences)
+            if (exportNames.ContainsKey(interfaceRef.ExportName))
+                diagnostics.Add(Diagnostic.Create(DuplicateModuleExportNameError, location, moduleName,
+                    interfaceRef.ExportName));
+            else
+                exportNames[interfaceRef.ExportName] = interfaceRef.SimpleName;
     }
 
     private static bool IsPartialClass(INamedTypeSymbol symbol, CancellationToken ct)
@@ -917,6 +1039,13 @@ public partial class JSBindingGenerator : IIncrementalGenerator
 
         if (type is IArrayTypeSymbol arrayOfPrimitives && IsPrimitiveType(arrayOfPrimitives.ElementType))
             return true;
+
+        if (type is IArrayTypeSymbol arrayType &&
+            (HasAttribute(arrayType.ElementType, "HakoJS.SourceGeneration.JSObjectAttribute") ||
+             HasAttribute(arrayType.ElementType, "HakoJS.SourceGeneration.JSClassAttribute")))
+        {
+            return true;
+        }
 
         if (IsTaskType(type))
         {
@@ -1031,7 +1160,7 @@ public partial class JSBindingGenerator : IIncrementalGenerator
     {
         var typeInfo = CreateTypeInfo(param.Type);
         var isDelegate = IsDelegateType(param.Type);
-    
+
         return new ParameterModel
         {
             Name = param.Name,
