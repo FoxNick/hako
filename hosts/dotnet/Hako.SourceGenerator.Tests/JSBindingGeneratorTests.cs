@@ -76,10 +76,24 @@ namespace HakoJS.SourceGeneration
         public string? ExportName { get; set; }
     }
 
+    [System.AttributeUsage(System.AttributeTargets.Enum)]
+    public class JSEnumAttribute : System.Attribute
+    {
+        public string? Name { get; set; }
+    }
+
+    [System.AttributeUsage(System.AttributeTargets.Class, AllowMultiple = true)]
+    public class JSModuleEnumAttribute : System.Attribute
+    {
+        public System.Type? EnumType { get; set; }
+        public string? ExportName { get; set; }
+    }
+
     [System.AttributeUsage(System.AttributeTargets.Class, Inherited = false)]
     public class JSObjectAttribute : System.Attribute
     {
     }
+
 
     [System.AttributeUsage(System.AttributeTargets.Parameter)]
     public class JSPropertyNameAttribute : System.Attribute
@@ -4087,8 +4101,8 @@ public partial class ProcessingOptions
 
         var generatedCode = result.GeneratedTrees.First(t => t.FilePath.Contains("DataUtils")).GetText().ToString();
 
-        var typeDefStart = generatedCode.IndexOf("return @\"") + 9;
-        var typeDefEnd = generatedCode.IndexOf("\";", typeDefStart);
+        var typeDefStart = generatedCode.IndexOf("return @\"", StringComparison.Ordinal) + 9;
+        var typeDefEnd = generatedCode.IndexOf("\";", typeDefStart, StringComparison.Ordinal);
         var typeDef = generatedCode.Substring(typeDefStart, typeDefEnd - typeDefStart);
 
         Assert.Contains("**advanced**", typeDef);
@@ -5043,10 +5057,10 @@ public partial class MyModule
         var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
 
         // Check the order: classes, then interfaces, then values, then methods
-        var classPos = moduleCode.IndexOf("export class MyClass");
-        var interfacePos = moduleCode.IndexOf("export interface MyInterface");
-        var valuePos = moduleCode.IndexOf("export const version");
-        var methodPos = moduleCode.IndexOf("export function doSomething");
+        var classPos = moduleCode.IndexOf("export class MyClass", StringComparison.Ordinal);
+        var interfacePos = moduleCode.IndexOf("export interface MyInterface", StringComparison.Ordinal);
+        var valuePos = moduleCode.IndexOf("export const version", StringComparison.Ordinal);
+        var methodPos = moduleCode.IndexOf("export function doSomething", StringComparison.Ordinal);
 
         Assert.True(classPos < interfacePos, "Class should come before interface");
         Assert.True(interfacePos < valuePos, "Interface should come before values");
@@ -5192,6 +5206,870 @@ public partial class LoggingModule
         Assert.Contains(
             ".AddExports(\"defaultLevel\", \"configure\", \"getRecent\", \"Logger\", \"LogConfig\", \"LogEntry\")",
             moduleCode);
+    }
+
+    #endregion
+
+    #region JSEnum Tests
+
+    [Fact]
+    public void GeneratesBasicEnumAsStrings()
+    {
+        var source = @"
+using HakoJS.SourceGeneration;
+
+namespace TestNamespace;
+
+[JSEnum]
+public enum FileMode
+{
+    Read,
+    Write,
+    Append
+}
+
+[JSClass]
+public partial class FileHandler
+{
+    [JSProperty]
+    public FileMode Mode { get; set; }
+    
+    [JSMethod]
+    public void SetMode(FileMode mode) { }
+    
+    [JSMethod]
+    public FileMode GetMode() => FileMode.Read;
+}
+";
+
+        var result = RunGenerator(source);
+
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees.First(t => t.FilePath.Contains("FileHandler")).GetText().ToString();
+
+        // Should marshal enum as string
+        Assert.Contains(".ToString())", generatedCode);
+        Assert.Contains("ctx.NewString", generatedCode);
+
+        // Should unmarshal enum from string
+        Assert.Contains("global::System.Enum.Parse<", generatedCode);
+        Assert.Contains("FileMode>", generatedCode);
+        Assert.Contains("AsString()", generatedCode);
+
+        // Should check IsString
+        Assert.Contains("IsString()", generatedCode);
+        Assert.Contains(
+            "return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Value 'Mode' must be a string (enum)\");",
+            generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesFlagsEnumAsNumbers()
+    {
+        var source = @"
+using HakoJS.SourceGeneration;
+using System;
+
+namespace TestNamespace;
+
+[Flags]
+[JSEnum]
+public enum FileAccess
+{
+    None = 0,
+    Read = 1,
+    Write = 2,
+    Execute = 4,
+    All = 7
+}
+
+[JSClass]
+public partial class FileSystem
+{
+    [JSProperty]
+    public FileAccess Permissions { get; set; }
+    
+    [JSMethod]
+    public void SetPermissions(FileAccess access) { }
+    
+    [JSMethod]
+    public FileAccess GetPermissions() => FileAccess.Read;
+}
+";
+
+        var result = RunGenerator(source);
+
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees.First(t => t.FilePath.Contains("FileSystem")).GetText().ToString();
+
+        // Should marshal enum as number
+        Assert.Contains("ctx.NewNumber((int)", generatedCode);
+
+        // Should unmarshal enum from number
+        Assert.Contains("(global::TestNamespace.FileAccess)(int)", generatedCode);
+        Assert.Contains("AsNumber()", generatedCode);
+
+        // Should check IsNumber
+        Assert.Contains("IsNumber()", generatedCode);
+        Assert.Contains(
+            "return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Value 'Permissions' must be a number (flags enum)\");",
+            generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesNullableEnum()
+    {
+        var source = @"
+using HakoJS.SourceGeneration;
+
+namespace TestNamespace;
+
+[JSEnum]
+public enum Status
+{
+    Active,
+    Inactive
+}
+
+[JSClass]
+public partial class User
+{
+    [JSProperty]
+    public Status? CurrentStatus { get; set; }
+    
+    [JSMethod]
+    public Status? GetStatus(Status? filter) => null;
+}
+";
+
+        var result = RunGenerator(source);
+
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees.First(t => t.FilePath.Contains("User")).GetText().ToString();
+
+        // Should handle nullable enum marshaling
+        Assert.Contains("ctx.Null()", generatedCode);
+        Assert.Contains(".ToString())", generatedCode);
+
+        // Should handle nullable enum unmarshaling
+        Assert.Contains("IsNullOrUndefined()", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesEnumArrays()
+    {
+        var source = @"
+using HakoJS.SourceGeneration;
+
+namespace TestNamespace;
+
+[JSEnum]
+public enum Priority
+{
+    Low,
+    Medium,
+    High
+}
+
+[JSClass]
+public partial class TaskManager
+{
+    [JSProperty]
+    public Priority[] Priorities { get; set; }
+    
+    [JSMethod]
+    public Priority[] GetPriorities() => null;
+    
+    [JSMethod]
+    public void SetPriorities(Priority[] priorities) { }
+}
+";
+
+        var result = RunGenerator(source);
+
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees.First(t => t.FilePath.Contains("TaskManager")).GetText().ToString();
+
+        // Should handle enum arrays
+        Assert.Contains("ToJSArrayOf", generatedCode);
+        Assert.Contains("ToArrayOf<global::TestNamespace.Priority>", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesEnumInRecord()
+    {
+        var source = @"
+using HakoJS.SourceGeneration;
+
+namespace TestNamespace;
+
+[JSEnum]
+public enum LogLevel
+{
+    Debug,
+    Info,
+    Warning,
+    Error
+}
+
+[JSObject]
+public partial record LogEntry(
+    string Message,
+    LogLevel Level,
+    LogLevel? OptionalLevel = null
+);
+";
+
+        var result = RunGenerator(source);
+
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees.First(t => t.FilePath.Contains("LogEntry")).GetText().ToString();
+
+        // ToJSValue should marshal enum
+        Assert.Contains("realm.NewString", generatedCode);
+        Assert.Contains(".ToString())", generatedCode);
+
+        // FromJSValue should unmarshal enum
+        Assert.Contains("global::System.Enum.Parse<", generatedCode);
+        Assert.Contains("LogLevel>", generatedCode);
+        Assert.Contains("IsString()", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesEnumInModule()
+    {
+        var source = @"
+using HakoJS.SourceGeneration;
+
+namespace TestNamespace;
+
+[JSEnum]
+public enum HttpMethod
+{
+    Get,
+    Post,
+    Put,
+    Delete
+}
+
+[JSModule]
+public partial class HttpModule
+{
+    [JSModuleValue]
+    public static HttpMethod DefaultMethod = HttpMethod.Get;
+    
+    [JSModuleMethod]
+    public static void Request(string url, HttpMethod method) { }
+    
+    [JSModuleMethod]
+    public static HttpMethod GetMethod() => HttpMethod.Get;
+}
+";
+
+        var result = RunGenerator(source);
+
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
+
+        // Should marshal enum in module
+        Assert.Contains("ctx.NewString", generatedCode);
+        Assert.Contains(".ToString())", generatedCode);
+
+        // Should unmarshal enum from module method parameter
+        Assert.Contains("global::System.Enum.Parse<", generatedCode);
+        Assert.Contains("HttpMethod>", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTypeScriptForBasicEnum()
+    {
+        var source = @"
+using HakoJS.SourceGeneration;
+
+namespace TestNamespace;
+
+[JSEnum]
+public enum Color
+{
+    Red,
+    Green,
+    Blue
+}
+
+[JSClass]
+public partial class Renderer
+{
+    [JSProperty]
+    public Color BackgroundColor { get; set; }
+}
+";
+
+        var result = RunGenerator(source);
+
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Renderer")).GetText().ToString();
+        ;
+
+        // Should map enum to TypeScript enum type
+        Assert.Contains("backgroundColor: Color;", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTypeScriptForFlagsEnum()
+    {
+        var source = @"
+using HakoJS.SourceGeneration;
+using System;
+
+namespace TestNamespace;
+
+[Flags]
+[JSEnum]
+public enum Permissions
+{
+    None = 0,
+    Read = 1,
+    Write = 2,
+    Execute = 4
+}
+
+[JSClass]
+public partial class Security
+{
+    [JSProperty]
+    public Permissions Access { get; set; }
+}
+";
+
+        var result = RunGenerator(source);
+
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Security")).GetText().ToString();
+        // Should map flags enum to TypeScript enum type (still just the enum name)
+        Assert.Contains("access: Permissions;", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTypeScriptForNullableEnum()
+    {
+        var source = @"
+using HakoJS.SourceGeneration;
+
+namespace TestNamespace;
+
+[JSEnum]
+public enum State
+{
+    Active,
+    Inactive
+}
+
+[JSClass]
+public partial class Entity
+{
+    [JSProperty]
+    public State? CurrentState { get; set; }
+}
+";
+
+        var result = RunGenerator(source);
+
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Entity")).GetText().ToString();
+        Assert.Contains("currentState: State | null;", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesModuleEnumExport()
+    {
+        var source = @"
+using HakoJS.SourceGeneration;
+
+namespace TestNamespace;
+
+[JSEnum]
+public enum LogLevel
+{
+    Debug,
+    Info,
+    Warning,
+    Error
+}
+
+[JSModule(Name = ""logging"")]
+[JSModuleEnum(EnumType = typeof(LogLevel), ExportName = ""LogLevel"")]
+public partial class LoggingModule
+{
+    [JSModuleMethod]
+    public static void Log(string message, LogLevel level) { }
+}
+";
+
+        var result = RunGenerator(source);
+
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
+
+
+
+        // Should export enum as const object with string values
+        Assert.Contains("export const LogLevel: {", generatedCode);
+        Assert.Contains("readonly Debug: \"\"Debug\"\";", generatedCode);
+        Assert.Contains("readonly Info: \"\"Info\"\";", generatedCode);
+        Assert.Contains("readonly Warning: \"\"Warning\"\";", generatedCode);
+        Assert.Contains("readonly Error: \"\"Error\"\";", generatedCode);
+        Assert.Contains("};", generatedCode);
+        Assert.Contains("export type LogLevel = typeof LogLevel[keyof typeof LogLevel];", generatedCode);
+
+        // Should add to exports list in C# code
+        Assert.Contains(".AddExports(", generatedCode);
+        Assert.Contains("\"LogLevel\"", generatedCode);
+
+        // Should create enum object at runtime in C# code
+        Assert.Contains("using var logLevelObj = realm.NewObject();", generatedCode);
+        Assert.Contains("logLevelObj.SetProperty(\"Debug\", realm.NewString(\"Debug\"));", generatedCode);
+        Assert.Contains("init.SetExport(\"LogLevel\", logLevelObj);", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesModuleFlagsEnumExport()
+    {
+        var source = @"
+using HakoJS.SourceGeneration;
+using System;
+
+namespace TestNamespace;
+
+[Flags]
+[JSEnum]
+public enum FileAccess
+{
+    None = 0,
+    Read = 1,
+    Write = 2,
+    Execute = 4,
+    All = 7
+}
+
+[JSModule(Name = ""fs"")]
+[JSModuleEnum(EnumType = typeof(FileAccess))]
+public partial class FileSystemModule
+{
+    [JSModuleMethod]
+    public static void SetPermissions(string path, FileAccess access) { }
+}
+";
+
+        var result = RunGenerator(source);
+
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
+
+        // Extract TypeScript definition
+        var typeDefStart = generatedCode.IndexOf("return @\"", StringComparison.Ordinal) + 9;
+        var typeDefEnd = generatedCode.IndexOf("\";", typeDefStart, StringComparison.Ordinal);
+        var typeDef = generatedCode.Substring(typeDefStart, typeDefEnd - typeDefStart);
+
+        // Should export enum as const object with number values
+        Assert.Contains("export const FileAccess: {", typeDef);
+        Assert.Contains("readonly None: 0;", typeDef);
+        Assert.Contains("readonly Read: 1;", typeDef);
+        Assert.Contains("readonly Write: 2;", typeDef);
+        Assert.Contains("readonly Execute: 4;", typeDef);
+        Assert.Contains("readonly All: 7;", typeDef);
+        Assert.Contains("};", typeDef);
+        Assert.Contains("export type FileAccess = typeof FileAccess[keyof typeof FileAccess];", typeDef);
+
+        // Should create enum object with number values in C# code
+        Assert.Contains("using var fileAccessObj = realm.NewObject();", generatedCode);
+        Assert.Contains("fileAccessObj.SetProperty(\"None\", realm.NewNumber(0));", generatedCode);
+        Assert.Contains("fileAccessObj.SetProperty(\"Read\", realm.NewNumber(1));", generatedCode);
+    }
+
+    [Fact]
+    public void ReportsErrorForEnumWithoutJSEnumAttribute()
+    {
+        var source = @"
+using HakoJS.SourceGeneration;
+
+namespace TestNamespace;
+
+// No [JSEnum] attribute
+public enum InvalidEnum
+{
+    Value1,
+    Value2
+}
+
+[JSClass]
+public partial class TestClass
+{
+    [JSProperty]
+    public InvalidEnum Mode { get; set; }
+}
+";
+
+        var result = RunGenerator(source);
+
+        var error = result.Diagnostics.FirstOrDefault(d => d.Id == "HAKO012");
+        Assert.NotNull(error);
+        Assert.Contains("cannot be marshaled", error.GetMessage());
+    }
+
+    [Fact]
+    public void ReportsErrorForInvalidModuleEnum()
+    {
+        var source = @"
+using HakoJS.SourceGeneration;
+
+namespace TestNamespace;
+
+// No [JSEnum] attribute
+public enum InvalidEnum
+{
+    Value1,
+    Value2
+}
+
+[JSModule]
+[JSModuleEnum(EnumType = typeof(InvalidEnum))]
+public partial class TestModule
+{
+}
+";
+
+        var result = RunGenerator(source);
+
+        var error = result.Diagnostics.FirstOrDefault(d => d.Id == "HAKO022");
+        Assert.NotNull(error);
+        Assert.Equal(DiagnosticSeverity.Error, error.Severity);
+        Assert.Contains("does not have the [JSEnum] attribute", error.GetMessage());
+    }
+
+    [Fact]
+    public void ReportsErrorForDuplicateModuleEnumExport()
+    {
+        var source = @"
+using HakoJS.SourceGeneration;
+
+namespace TestNamespace;
+
+[JSEnum]
+public enum Status
+{
+    Active,
+    Inactive
+}
+
+[JSModule]
+[JSModuleEnum(EnumType = typeof(Status), ExportName = ""test"")]
+public partial class TestModule
+{
+    [JSModuleValue(Name = ""test"")]
+    public static string TestValue = ""value"";
+}
+";
+
+        var result = RunGenerator(source);
+
+        var error = result.Diagnostics.FirstOrDefault(d => d.Id == "HAKO011");
+        Assert.NotNull(error);
+        Assert.Contains("Export names must be unique", error.GetMessage());
+    }
+
+    [Fact]
+    public void GeneratesMultipleModuleEnums()
+    {
+        var source = @"
+using HakoJS.SourceGeneration;
+
+namespace TestNamespace;
+
+[JSEnum]
+public enum LogLevel
+{
+    Debug,
+    Info,
+    Warning,
+    Error
+}
+
+[JSEnum]
+public enum LogCategory
+{
+    System,
+    Application,
+    Security
+}
+
+[JSModule]
+[JSModuleEnum(EnumType = typeof(LogLevel))]
+[JSModuleEnum(EnumType = typeof(LogCategory))]
+public partial class LoggingModule
+{
+    [JSModuleMethod]
+    public static void Log(string message, LogLevel level, LogCategory category) { }
+}
+";
+
+        var result = RunGenerator(source);
+
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
+
+
+        // Should export both enums
+        Assert.Contains("export const LogLevel: {", generatedCode);
+        Assert.Contains("export const LogCategory: {", generatedCode);
+
+        // Should add both to exports
+        Assert.Contains(".AddExports(", generatedCode);
+        Assert.Contains("\"LogLevel\"", generatedCode);
+        Assert.Contains("\"LogCategory\"", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesEnumWithCustomJSName()
+    {
+        var source = @"
+using HakoJS.SourceGeneration;
+
+namespace TestNamespace;
+
+[JSEnum(Name = ""FileOpenMode"")]
+public enum FileMode
+{
+    Read,
+    Write
+}
+
+[JSModule]
+[JSModuleEnum(EnumType = typeof(FileMode), ExportName = ""FileOpenMode"")]
+public partial class FileModule
+{
+}
+";
+
+        var result = RunGenerator(source);
+
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
+
+        // Extract TypeScript definition
+        var typeDefStart = generatedCode.IndexOf("return @\"", StringComparison.Ordinal) + 9;
+        var typeDefEnd = generatedCode.IndexOf("\";", typeDefStart, StringComparison.Ordinal);
+        var typeDef = generatedCode.Substring(typeDefStart, typeDefEnd - typeDefStart);
+
+        // Should use custom name
+        Assert.Contains("export const FileOpenMode: {", typeDef);
+        Assert.Contains(".AddExports(\"FileOpenMode\")", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesEnumWithDocumentation()
+    {
+        var source = @"
+using HakoJS.SourceGeneration;
+
+namespace TestNamespace;
+
+/// <summary>
+/// Represents the severity level of a log message.
+/// </summary>
+[JSEnum]
+public enum LogLevel
+{
+    /// <summary>
+    /// Detailed debugging information.
+    /// </summary>
+    Debug,
+    
+    /// <summary>
+    /// General informational messages.
+    /// </summary>
+    Info,
+    
+    /// <summary>
+    /// Warning messages for potential issues.
+    /// </summary>
+    Warning,
+    
+    /// <summary>
+    /// Error messages for failures.
+    /// </summary>
+    Error
+}
+
+[JSModule]
+[JSModuleEnum(EnumType = typeof(LogLevel))]
+public partial class LoggingModule
+{
+}
+";
+
+        var result = RunGenerator(source);
+
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
+
+
+        // Should include enum documentation
+        Assert.Contains("* Represents the severity level of a log message.", generatedCode);
+
+        // Should include value documentation
+        Assert.Contains("* Detailed debugging information.", generatedCode);
+        Assert.Contains("* General informational messages.", generatedCode);
+        Assert.Contains("* Warning messages for potential issues.", generatedCode);
+        Assert.Contains("* Error messages for failures.", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesComplexModuleWithEnums()
+    {
+        var source = @"
+using HakoJS.SourceGeneration;
+using System;
+
+namespace TestNamespace;
+
+[JSEnum]
+public enum HttpMethod
+{
+    Get,
+    Post,
+    Put,
+    Delete
+}
+
+[Flags]
+[JSEnum]
+public enum HttpHeaders
+{
+    None = 0,
+    ContentType = 1,
+    Authorization = 2,
+    Accept = 4
+}
+
+[JSObject]
+public partial record HttpRequest(
+    string Url,
+    HttpMethod Method,
+    HttpHeaders Headers
+);
+
+[JSClass]
+public partial class HttpClient
+{
+    [JSMethod]
+    public void Send(HttpRequest request) { }
+}
+
+[JSModule(Name = ""http"")]
+[JSModuleEnum(EnumType = typeof(HttpMethod))]
+[JSModuleEnum(EnumType = typeof(HttpHeaders))]
+[JSModuleClass(ClassType = typeof(HttpClient))]
+[JSModuleInterface(InterfaceType = typeof(HttpRequest))]
+public partial class HttpModule
+{
+    [JSModuleMethod]
+    public static void Request(string url, HttpMethod method) { }
+}
+";
+
+        var result = RunGenerator(source);
+
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("HttpModule")).GetText().ToString();
+
+
+
+        // Should export enums
+        Assert.Contains("export const HttpMethod: {", moduleCode);
+        Assert.Contains("readonly Get: \"\"Get\"", moduleCode);
+
+        Assert.Contains("export const HttpHeaders: {", moduleCode);
+        Assert.Contains("readonly None: 0;", moduleCode);
+        Assert.Contains("readonly ContentType: 1;", moduleCode);
+
+        // Should export class
+        Assert.Contains("export class HttpClient {", moduleCode);
+
+        // Should export interface with enum types
+        Assert.Contains("export interface HttpRequest {", moduleCode);
+        Assert.Contains("url: string;", moduleCode);
+        Assert.Contains("method: HttpMethod;", moduleCode);
+        Assert.Contains("headers: HttpHeaders;", moduleCode);
+
+        // Should export function with enum parameter
+        Assert.Contains("export function request(url: string, method: HttpMethod): void;", moduleCode);
+
+        // Should add all to exports
+        Assert.Contains(".AddExports(", moduleCode);
+    }
+
+    [Fact]
+    public void FlagsEnumPreservesNumericValues()
+    {
+        var source = @"
+using HakoJS.SourceGeneration;
+using System;
+
+namespace TestNamespace;
+
+[Flags]
+[JSEnum]
+public enum Permissions
+{
+    None = 0,
+    Read = 1,
+    Write = 2,
+    Execute = 4,
+    ReadWrite = Read | Write,
+    All = Read | Write | Execute
+}
+
+[JSModule]
+[JSModuleEnum(EnumType = typeof(Permissions))]
+public partial class SecurityModule
+{
+}
+";
+
+        var result = RunGenerator(source);
+
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
+
+        // Extract TypeScript definition
+        var typeDefStart = generatedCode.IndexOf("return @\"", StringComparison.Ordinal) + 9;
+        var typeDefEnd = generatedCode.IndexOf("\";", typeDefStart, StringComparison.Ordinal);
+        var typeDef = generatedCode.Substring(typeDefStart, typeDefEnd - typeDefStart);
+
+        // Flags enums should preserve numeric values
+        Assert.Contains("export const Permissions: {", typeDef);
+        Assert.Contains("readonly None: 0;", typeDef);
+        Assert.Contains("readonly Read: 1;", typeDef);
+        Assert.Contains("readonly Write: 2;", typeDef);
+        Assert.Contains("readonly Execute: 4;", typeDef);
+        Assert.Contains("readonly ReadWrite: 3;", typeDef); // 1 | 2 = 3
+        Assert.Contains("readonly All: 7;", typeDef); // 1 | 2 | 4 = 7
     }
 
     #endregion

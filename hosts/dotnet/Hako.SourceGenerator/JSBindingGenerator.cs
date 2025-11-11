@@ -20,6 +20,22 @@ public partial class JSBindingGenerator : IIncrementalGenerator
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
+        
+        var settings = context.CompilationProvider
+            .Select((c, _)  => 
+            {
+                // Assuming this is a C# project, this should be true!
+                LanguageVersion? csharpVersion = c is CSharpCompilation comp
+                    ? comp.LanguageVersion
+                    : null;
+
+                return (
+                    c.Options.Platform,
+                    c.Options.OptimizationLevel,
+                    c.AssemblyName,
+                    LanguageVersion: csharpVersion);
+            });
+        
         var classProviderWithDiagnostics = context.SyntaxProvider
             .ForAttributeWithMetadataName(JSClassAttributeName, (node, _) => node is ClassDeclarationSyntax,
                 GetClassModel);
@@ -62,6 +78,14 @@ public partial class JSBindingGenerator : IIncrementalGenerator
                     TypeDependencies[interfaceRef.SimpleName] = new TypeDependency
                     {
                         TypeName = interfaceRef.SimpleName,
+                        ModuleName = module.ModuleName,
+                        IsFromModule = true
+                    };
+
+                foreach (var enumRef in module.EnumReferences)
+                    TypeDependencies[enumRef.SimpleName] = new TypeDependency
+                    {
+                        TypeName = enumRef.SimpleName,
                         ModuleName = module.ModuleName,
                         IsFromModule = true
                     };
@@ -155,6 +179,24 @@ public partial class JSBindingGenerator : IIncrementalGenerator
             .Select((result, _) => result.Model!);
 
         context.RegisterSourceOutput(marshalableProvider, GenerateMarshalableSource);
+        
+        var enumProviderWithDiagnostics = context.SyntaxProvider
+            .ForAttributeWithMetadataName(
+                "HakoJS.SourceGeneration.JSEnumAttribute",
+                (node, _) => node is EnumDeclarationSyntax,
+                GetEnumModel);
+
+        context.ReportDiagnostics(enumProviderWithDiagnostics.Select((result, _) => result.Diagnostics));
+
+        var validEnumModels = enumProviderWithDiagnostics
+            .Where(result => result.Model != null)
+            .Select((result, _) => result.Model!);
+        
+        var enumModelsWithSettings = validEnumModels.Combine(settings);
+
+        context.RegisterSourceOutput(enumModelsWithSettings, static (ctx, data) => 
+            GenerateEnumSource(ctx, data.Left, data.Right));
+    
     }
 
     #region Diagnostic Descriptors
@@ -265,6 +307,11 @@ public partial class JSBindingGenerator : IIncrementalGenerator
         "Interface '{0}' is referenced by multiple modules ('{1}' and '{2}'). An interface can only belong to one module.",
         "HakoJS.SourceGenerator", DiagnosticSeverity.Error, true);
 
+    private static readonly DiagnosticDescriptor InvalidModuleEnumError = new(
+        "HAKO022", "Invalid module enum reference",
+        "Type '{0}' referenced in [JSModuleEnum] is not an enum or does not have the [JSEnum] attribute",
+        "HakoJS.SourceGenerator", DiagnosticSeverity.Error, true);
+
     #endregion
 
     #region Model Extraction Methods
@@ -334,8 +381,10 @@ public partial class JSBindingGenerator : IIncrementalGenerator
         var methods = FindModuleMethods(classSymbol, moduleName, diagnostics);
         var classReferences = FindModuleClassReferences(classSymbol, diagnostics);
         var interfaceReferences = FindModuleInterfaceReferences(classSymbol, diagnostics);
+        var enumReferences = FindModuleEnumReferences(classSymbol, diagnostics);
 
-        ValidateModuleExports(moduleName, location, values, methods, classReferences, interfaceReferences, diagnostics);
+        ValidateModuleExports(moduleName, location, values, methods, classReferences, interfaceReferences,
+            enumReferences, diagnostics);
 
         if (diagnostics.Count > 0)
             return new ModuleResult(null, diagnostics.ToImmutable());
@@ -343,6 +392,7 @@ public partial class JSBindingGenerator : IIncrementalGenerator
         var documentation = ExtractXmlDocumentation(classSymbol);
         var typeScriptDefinition =
             GenerateModuleTypeScriptDefinition(moduleName, values, methods, classReferences, interfaceReferences,
+                enumReferences,
                 documentation);
 
         var model = new ModuleModel
@@ -357,6 +407,7 @@ public partial class JSBindingGenerator : IIncrementalGenerator
             Methods = methods,
             ClassReferences = classReferences,
             InterfaceReferences = interfaceReferences,
+            EnumReferences = enumReferences,
             TypeScriptDefinition = typeScriptDefinition,
             Documentation = documentation
         };
@@ -630,6 +681,95 @@ public partial class JSBindingGenerator : IIncrementalGenerator
 
         return methods;
     }
+    
+    private static string GetJsEnumName(INamedTypeSymbol enumSymbol)
+    {
+        var jsEnumAttr = enumSymbol.GetAttributes()
+            .FirstOrDefault(a => a.AttributeClass?.ToDisplayString() == "HakoJS.SourceGeneration.JSEnumAttribute");
+
+        if (jsEnumAttr != null)
+            foreach (var arg in jsEnumAttr.NamedArguments)
+                if (arg is { Key: "Name", Value.Value: string name })
+                    return name;
+
+        return enumSymbol.Name;
+    }
+
+   private static List<ModuleEnumReference> FindModuleEnumReferences(INamedTypeSymbol classSymbol,
+    ImmutableArray<Diagnostic>.Builder diagnostics)
+{
+    var references = new List<ModuleEnumReference>();
+    var location = classSymbol.Locations.FirstOrDefault() ?? Location.None;
+
+    foreach (var attr in classSymbol.GetAttributes())
+    {
+        if (attr.AttributeClass?.Name != "JSModuleEnumAttribute")
+            continue;
+
+        INamedTypeSymbol? enumType = null;
+        string? exportName = null;
+
+        foreach (var arg in attr.NamedArguments)
+            if (arg is { Key: "EnumType", Value.Value: INamedTypeSymbol type })
+                enumType = type;
+            else if (arg is { Key: "ExportName", Value.Value: string name })
+                exportName = name;
+
+        if (enumType == null)
+            continue;
+
+        if (enumType.TypeKind != TypeKind.Enum)
+        {
+            diagnostics.Add(Diagnostic.Create(InvalidModuleEnumError, location,
+                enumType.ToDisplayString()));
+            continue;
+        }
+
+        if (!HasAttribute(enumType, "HakoJS.SourceGeneration.JSEnumAttribute"))
+        {
+            diagnostics.Add(Diagnostic.Create(InvalidModuleEnumError, location,
+                enumType.ToDisplayString()));
+            continue;
+        }
+        
+        var jsEnumName = GetJsEnumName(enumType);
+        exportName ??= jsEnumName;
+
+        var isFlags = enumType.GetAttributes()
+            .Any(a => a.AttributeClass?.ToDisplayString() == "System.FlagsAttribute");
+
+        var values = new List<EnumValueModel>();
+        foreach (var member in enumType.GetMembers().OfType<IFieldSymbol>())
+        {
+            if (member.IsImplicitlyDeclared || !member.HasConstantValue)
+                continue;
+
+            values.Add(new EnumValueModel
+            {
+                Name = member.Name,
+                JsName = member.Name,
+                Value = member.ConstantValue ?? 0,
+                Documentation = ExtractXmlDocumentation(member)
+            });
+        }
+
+        var documentation = ExtractXmlDocumentation(enumType);
+        var enumTypeScriptDef = GenerateEnumTypeScriptDefinition(jsEnumName, values, isFlags, documentation);
+
+        references.Add(new ModuleEnumReference
+        {
+            FullTypeName = enumType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+            SimpleName = enumType.Name,
+            ExportName = exportName,
+            TypeScriptDefinition = enumTypeScriptDef,
+            Documentation = documentation,
+            Values = values,
+            IsFlags = isFlags
+        });
+    }
+
+    return references;
+}
 
     private static List<ModuleValueModel> FindModuleValues(INamedTypeSymbol classSymbol, string moduleName,
         ImmutableArray<Diagnostic>.Builder diagnostics)
@@ -934,6 +1074,7 @@ public partial class JSBindingGenerator : IIncrementalGenerator
     private static void ValidateModuleExports(string moduleName, Location location,
         List<ModuleValueModel> values, List<ModuleMethodModel> methods,
         List<ModuleClassReference> classReferences, List<ModuleInterfaceReference> interfaceReferences,
+        List<ModuleEnumReference> enumReferences,
         ImmutableArray<Diagnostic>.Builder diagnostics)
     {
         var exportNames = new Dictionary<string, string>();
@@ -963,6 +1104,13 @@ public partial class JSBindingGenerator : IIncrementalGenerator
                     interfaceRef.ExportName));
             else
                 exportNames[interfaceRef.ExportName] = interfaceRef.SimpleName;
+
+        foreach (var enumRef in enumReferences)
+            if (exportNames.ContainsKey(enumRef.ExportName))
+                diagnostics.Add(Diagnostic.Create(DuplicateModuleExportNameError, location, moduleName,
+                    enumRef.ExportName));
+            else
+                exportNames[enumRef.ExportName] = enumRef.SimpleName;
     }
 
     private static bool IsPartialClass(INamedTypeSymbol symbol, CancellationToken ct)
@@ -1024,45 +1172,61 @@ public partial class JSBindingGenerator : IIncrementalGenerator
     }
 
     private static bool CanMarshalType(ITypeSymbol type)
+{
+    if (type.SpecialType == SpecialType.System_Void)
+        return true;
+
+    if (IsPrimitiveType(type))
+        return true;
+
+    if (type.IsNullableValueType() && type is INamedTypeSymbol { TypeArguments.Length: > 0 } namedType)
+        return CanMarshalType(namedType.TypeArguments[0]);
+
+    if (type is IArrayTypeSymbol { ElementType.SpecialType: SpecialType.System_Byte })
+        return true;
+
+    if (type is IArrayTypeSymbol arrayOfPrimitives && IsPrimitiveType(arrayOfPrimitives.ElementType))
+        return true;
+    
+    if (type is IArrayTypeSymbol arrayType)
     {
-        if (type.SpecialType == SpecialType.System_Void)
-            return true;
-
-        if (IsPrimitiveType(type))
-            return true;
-
-        if (type.IsNullableValueType() && type is INamedTypeSymbol { TypeArguments.Length: > 0 } namedType)
-            return CanMarshalType(namedType.TypeArguments[0]);
-
-        if (type is IArrayTypeSymbol { ElementType.SpecialType: SpecialType.System_Byte })
-            return true;
-
-        if (type is IArrayTypeSymbol arrayOfPrimitives && IsPrimitiveType(arrayOfPrimitives.ElementType))
-            return true;
-
-        if (type is IArrayTypeSymbol arrayType &&
-            (HasAttribute(arrayType.ElementType, "HakoJS.SourceGeneration.JSObjectAttribute") ||
-             HasAttribute(arrayType.ElementType, "HakoJS.SourceGeneration.JSClassAttribute")))
+        var elementType = arrayType.ElementType;
+        
+        // Check if element is [JSEnum]
+        if (elementType.TypeKind == TypeKind.Enum && elementType is INamedTypeSymbol enumSymbol)
         {
-            return true;
-        }
-
-        if (IsTaskType(type))
-        {
-            var innerType = GetTaskInnerType(type);
-            return innerType == null || CanMarshalType(innerType);
-        }
-
-        if (IsDelegateType(type))
-            return true;
-
-        if (type is INamedTypeSymbol classType)
-            if (HasAttribute(classType, "HakoJS.SourceGeneration.JSClassAttribute") ||
-                HasAttribute(classType, "HakoJS.SourceGeneration.JSObjectAttribute"))
+            if (HasAttribute(enumSymbol, "HakoJS.SourceGeneration.JSEnumAttribute"))
                 return true;
-
-        return ImplementsIJSMarshalable(type) || ImplementsIJSBindable(type);
+        }
+        
+        if (HasAttribute(elementType, "HakoJS.SourceGeneration.JSObjectAttribute") ||
+            HasAttribute(elementType, "HakoJS.SourceGeneration.JSClassAttribute"))
+        {
+            return true;
+        }
     }
+
+    if (IsTaskType(type))
+    {
+        var innerType = GetTaskInnerType(type);
+        return innerType == null || CanMarshalType(innerType);
+    }
+
+    if (IsDelegateType(type))
+        return true;
+    
+    if (type.TypeKind == TypeKind.Enum && type is INamedTypeSymbol enumSymbol2)
+    {
+        return HasAttribute(enumSymbol2, "HakoJS.SourceGeneration.JSEnumAttribute");
+    }
+
+    if (type is INamedTypeSymbol classType)
+        if (HasAttribute(classType, "HakoJS.SourceGeneration.JSClassAttribute") ||
+            HasAttribute(classType, "HakoJS.SourceGeneration.JSObjectAttribute"))
+            return true;
+
+    return ImplementsIJSMarshalable(type) || ImplementsIJSBindable(type);
+}
 
     private static bool IsPrimitiveType(ITypeSymbol type)
     {
@@ -1116,7 +1280,7 @@ public partial class JSBindingGenerator : IIncrementalGenerator
         if (type is INamedTypeSymbol { TypeArguments.Length: > 0 } namedType)
             return CreateTypeInfo(namedType.TypeArguments[0]);
 
-        return new TypeInfo("void", false, true, false, null, SpecialType.System_Void, null);
+        return new TypeInfo("void", false, true, false, null, SpecialType.System_Void, null, false, false);
     }
 
     private static bool IsDelegateType(ITypeSymbol type)
@@ -1189,7 +1353,22 @@ public partial class JSBindingGenerator : IIncrementalGenerator
         if (type.IsNullableValueType() && type is INamedTypeSymbol { TypeArguments.Length: > 0 } namedType)
             underlyingType = namedType.TypeArguments[0];
 
-        return new TypeInfo(fullName, isNullable, isValueType, isArray, elementType, specialType, underlyingType);
+        // Check if it's a [JSEnum]
+        var isEnum = false;
+        var isFlags = false;
+
+        if (type.TypeKind == TypeKind.Enum && type is INamedTypeSymbol enumSymbol)
+        {
+            isEnum = enumSymbol.GetAttributes()
+                .Any(a => a.AttributeClass?.ToDisplayString() == "HakoJS.SourceGeneration.JSEnumAttribute");
+
+            if (isEnum)
+                isFlags = enumSymbol.GetAttributes()
+                    .Any(a => a.AttributeClass?.ToDisplayString() == "System.FlagsAttribute");
+        }
+
+        return new TypeInfo(fullName, isNullable, isValueType, isArray, elementType, specialType, underlyingType,
+            isEnum, isFlags);
     }
 
     private static string? FormatDefaultValue(IParameterSymbol param)

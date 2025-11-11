@@ -1,5 +1,5 @@
 namespace HakoJS.Backend.Configuration;
-
+#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
 /// <summary>
 /// Configuration options for creating a WebAssembly store.
 /// Backends can extend this class for backend-specific options.

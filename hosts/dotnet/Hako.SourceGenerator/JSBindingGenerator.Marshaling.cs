@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis;
@@ -22,10 +21,7 @@ public partial class JSBindingGenerator
         sb.AppendLine("using HakoJS.Extensions;");
         sb.AppendLine("using HakoJS.SourceGeneration;");
         sb.AppendLine();
-        if (!string.IsNullOrEmpty(model.SourceNamespace))
-        {
-            sb.AppendLine($"namespace {model.SourceNamespace};");
-        }
+        if (!string.IsNullOrEmpty(model.SourceNamespace)) sb.AppendLine($"namespace {model.SourceNamespace};");
 
         sb.AppendLine();
 
@@ -130,7 +126,7 @@ public partial class JSBindingGenerator
         if (requiredParams > 0)
         {
             sb.AppendLine($"{indent}    if (args.Length < {requiredParams})");
-            
+
             sb.AppendLine(
                 $"{indent}        return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"{param.JsName}() requires at least {requiredParams} argument(s)\");");
             sb.AppendLine();
@@ -605,7 +601,13 @@ public partial class JSBindingGenerator
             case SpecialType.System_DateTime:
                 return $"{jsValueName}.IsDate()";
         }
-        
+
+        // Handle [JSEnum]
+        if (type.IsEnum)
+            return type.IsFlags
+                ? $"{jsValueName}.IsNumber()"
+                : $"{jsValueName}.IsString()";
+
         if (type.FullName == "global::System.Byte[]")
             return $"({jsValueName}.IsArrayBuffer() || {jsValueName}.IsTypedArray())";
 
@@ -647,20 +649,22 @@ public partial class JSBindingGenerator
                 return $"{jsValueName}.AsDateTime()";
         }
 
+        if (type.IsEnum)
+        {
+            if (type.IsFlags) return $"({type.FullName})(int){jsValueName}.AsNumber()";
+
+            return $"global::System.Enum.Parse<{type.FullName}>({jsValueName}.AsString(), ignoreCase: true)";
+        }
+
         if (type.FullName == "global::System.Byte[]")
             return
                 $"({jsValueName}.IsArrayBuffer() ? {jsValueName}.CopyArrayBuffer() : {jsValueName}.CopyTypedArray())";
 
         if (type is { IsArray: true, ElementType: not null })
         {
-            if (IsPrimitiveTypeName(type.ElementType))
-            {
-                return $"{jsValueName}.ToArray<{type.ElementType}>()";
-            }
-            else
-            {
-                return $"{jsValueName}.ToArrayOf<{type.ElementType}>()";
-            }
+            if (IsPrimitiveTypeName(type.ElementType)) return $"{jsValueName}.ToArray<{type.ElementType}>()";
+
+            return $"{jsValueName}.ToArrayOf<{type.ElementType}>()";
         }
 
         return $"{type.FullName}.FromJSValue({contextVarName}, {jsValueName})";
@@ -739,6 +743,9 @@ public partial class JSBindingGenerator
                 return "a Date";
         }
 
+        // Handle [JSEnum]
+        if (type.IsEnum) return type.IsFlags ? "a number (flags enum)" : "a string (enum)";
+
         if (type.FullName == "global::System.Byte[]")
             return "an ArrayBuffer or TypedArray";
 
@@ -786,10 +793,23 @@ public partial class JSBindingGenerator
                     $"{ctxName}.NewNumber(double.IsNaN({valueName}) || double.IsInfinity({valueName}) ? 0.0 : {valueName})";
             case SpecialType.System_Void:
                 return $"{ctxName}.Undefined()";
-            
+
             case SpecialType.System_DateTime:
-                return type.IsNullable ? $"({valueName}.HasValue ? {ctxName}.NewDate({valueName}.Value) : {ctxName}.Null())"
+                return type.IsNullable
+                    ? $"({valueName}.HasValue ? {ctxName}.NewDate({valueName}.Value) : {ctxName}.Null())"
                     : $"{ctxName}.NewDate({valueName})";
+        }
+
+        if (type.IsEnum)
+        {
+            if (type.IsFlags)
+                return type.IsNullable
+                    ? $"({valueName} == null ? {ctxName}.Null() : {ctxName}.NewNumber((int){valueName}))"
+                    : $"{ctxName}.NewNumber((int){valueName})";
+
+            return type.IsNullable
+                ? $"({valueName} == null ? {ctxName}.Null() : {ctxName}.NewString({valueName}.ToString()))"
+                : $"{ctxName}.NewString({valueName}.ToString())";
         }
 
         if (type.FullName == "global::System.Byte[]")
@@ -800,17 +820,13 @@ public partial class JSBindingGenerator
         if (type is { IsArray: true, ElementType: not null })
         {
             if (IsPrimitiveTypeName(type.ElementType))
-            {
                 return type.IsNullable
                     ? $"({valueName} == null ? {ctxName}.Null() : {valueName}.ToJSArray({ctxName}))"
                     : $"{valueName}.ToJSArray({ctxName})";
-            }
-            else
-            {
-                return type.IsNullable
-                    ? $"({valueName} == null ? {ctxName}.Null() : {valueName}.ToJSArrayOf({ctxName}))"
-                    : $"{valueName}.ToJSArrayOf({ctxName})";
-            }
+
+            return type.IsNullable
+                ? $"({valueName} == null ? {ctxName}.Null() : {valueName}.ToJSArrayOf({ctxName}))"
+                : $"{valueName}.ToJSArrayOf({ctxName})";
         }
 
         if (!type.IsValueType || type.IsNullable)

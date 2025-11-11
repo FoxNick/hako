@@ -303,4 +303,34 @@ public class ValueTests : TestBase
         using var boolBox = boolean.ToNativeValue<bool>();
         Assert.True(boolBox.Value);
     }
+
+    [Fact]
+    public void BigUInt_Test()
+    {
+        if (!IsAvailable) return;
+        using var realm = Hako.Runtime.CreateRealm();
+        using var str = realm.NewValue(9007199254740991UL);
+        Assert.True(str.IsBigInt());
+        Assert.Equal(9007199254740991UL, str.AsUInt64());
+    }
+    
+    [Fact]
+    public void BigInt_Test()
+    {
+        if (!IsAvailable) return;
+        using var realm = Hako.Runtime.CreateRealm();
+        using var str = realm.NewValue(9007199254740991L);
+        Assert.True(str.IsBigInt());
+        Assert.Equal(9007199254740991L, str.AsInt64());
+    }
+    
+    [Fact]
+    public void BigShortInt_Test()
+    {
+        if (!IsAvailable) return;
+        using var realm = Hako.Runtime.CreateRealm();
+        using var str = realm.NewValue(1L);
+        Assert.True(str.IsBigInt());
+        Assert.Equal(1L, str.AsInt64());
+    }
 }

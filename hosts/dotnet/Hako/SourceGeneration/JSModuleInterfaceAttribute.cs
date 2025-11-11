@@ -1,54 +1,74 @@
 namespace HakoJS.SourceGeneration;
 
 /// <summary>
-/// Exports a [JSClass] type from a module. Can be used multiple times to export multiple classes.
+/// Exports a [JSObject] type as an interface from a module. Can be used multiple times to export multiple interfaces.
+/// Unlike [JSModuleClass], interfaces are TypeScript-only and don't require runtime registration.
 /// </summary>
+/// <remarks>
+/// Use this attribute to include TypeScript interface definitions in your module's .d.ts output.
+/// This is useful for sharing type definitions between JavaScript and C# without creating class instances.
+/// </remarks>
 /// <example>
 /// <code>
-/// [JSClass]
-/// public partial class Vector2
-/// {
-///     [JSProperty]
-///     public double X { get; set; }
-///     
-///     [JSProperty]
-///     public double Y { get; set; }
-/// }
+/// [JSObject]
+/// public partial record Point(double X, double Y);
+/// 
+/// [JSObject]
+/// public partial record Rectangle(Point TopLeft, Point BottomRight);
 /// 
 /// [JSModule(Name = "geometry")]
-/// [JSModuleClass(ClassType = typeof(Vector2), ExportName = "Vector2")]
+/// [JSModuleInterface(InterfaceType = typeof(Point), ExportName = "Point")]
+/// [JSModuleInterface(InterfaceType = typeof(Rectangle), ExportName = "Rectangle")]
 /// public partial class GeometryModule
 /// {
 ///     [JSModuleMethod]
-///     public static double Distance(Vector2 a, Vector2 b)
+///     public static double CalculateArea(Rectangle rect)
 ///     {
-///         var dx = a.X - b.X;
-///         var dy = a.Y - b.Y;
-///         return Math.Sqrt(dx * dx + dy * dy);
+///         var width = rect.BottomRight.X - rect.TopLeft.X;
+///         var height = rect.BottomRight.Y - rect.TopLeft.Y;
+///         return width * height;
+///     }
+///     
+///     [JSModuleMethod]
+///     public static Point[] GetCorners(Rectangle rect)
+///     {
+///         return new[]
+///         {
+///             rect.TopLeft,
+///             new Point(rect.BottomRight.X, rect.TopLeft.Y),
+///             rect.BottomRight,
+///             new Point(rect.TopLeft.X, rect.BottomRight.Y)
+///         };
 ///     }
 /// }
 /// 
-/// // Register
-/// realm.RegisterClass&lt;Vector2&gt;();
+/// // Register module (no class registration needed for interfaces)
 /// runtime.ConfigureModules()
 ///     .WithModule&lt;GeometryModule&gt;()
 ///     .Apply();
 /// 
-/// // In JavaScript:
-/// // import { Vector2, distance } from 'geometry';
-/// // const v = new Vector2();
+/// // In TypeScript:
+/// // import { type Point, type Rectangle, calculateArea, getCorners } from 'geometry';
+/// // 
+/// // const rect: Rectangle = {
+/// //   topLeft: { x: 0, y: 0 },
+/// //   bottomRight: { x: 10, y: 10 }
+/// // };
+/// // 
+/// // const area = calculateArea(rect);
+/// // const corners: Point[] = getCorners(rect);
 /// </code>
 /// </example>
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
-public class JSModuleInterfaceAttribute<TType> : Attribute
+public class JSModuleInterfaceAttribute : Attribute
 {
     /// <summary>
-    /// The class type to export. Must have [JSClass] attribute.
+    /// The interface type to export. Must be a record with the [JSObject] attribute.
     /// </summary>
-    public TType? InterfaceType { get; set; }
+    public Type? InterfaceType { get; set; }
     
     /// <summary>
-    /// The export name in JavaScript. Defaults to the class name if not specified.
+    /// The export name in TypeScript. Defaults to the type name if not specified.
     /// </summary>
     public string? ExportName { get; set; }
 }

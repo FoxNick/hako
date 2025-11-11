@@ -1,7 +1,7 @@
 namespace HakoJS.Backend.Core;
 
 using HakoJS.Backend.Configuration;
-
+#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
 /// <summary>
 /// Factory interface for WebAssembly engines.
 /// </summary>

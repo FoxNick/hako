@@ -1,5 +1,5 @@
 namespace HakoJS.Backend.Core;
-
+#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
 /// <summary>
 /// An instantiated WebAssembly module with callable exports.
 /// </summary>
@@ -66,6 +66,9 @@ public abstract class WasmInstance : IDisposable
 
     // ===== Mixed Functions (int, double -> int) =====
     public abstract Func<int, double, int>? GetFunctionInt32WithDouble<T1, T2>(string name);
+    
+    // ===== Mixed Functions (int, long -> int) =====
+    public abstract Func<int, long, int>? GetFunctionInt32WithLong<T1, T2>(string name);
 
     // ===== Actions (0 params) =====
     public abstract Action? GetAction(string name);
