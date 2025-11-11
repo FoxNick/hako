@@ -10,8 +10,7 @@ namespace HakoJS.SourceGenerator.Tests;
 
 public class JSBindingGeneratorTests(ITestOutputHelper output)
 {
-
-private const string AttributesAndInterfacesText = @"
+    private const string AttributesAndInterfacesText = @"
 namespace HakoJS.SourceGeneration
 {
     [System.AttributeUsage(System.AttributeTargets.Class)]
@@ -345,7 +344,8 @@ namespace HakoJS.Extensions
                 MetadataReference.CreateFromFile(typeof(Console).Assembly.Location),
                 MetadataReference.CreateFromFile(typeof(Enumerable).Assembly.Location),
                 MetadataReference.CreateFromFile(typeof(Task).Assembly.Location),
-                MetadataReference.CreateFromFile(typeof(System.Collections.Concurrent.ConcurrentDictionary<,>).Assembly.Location)
+                MetadataReference.CreateFromFile(typeof(System.Collections.Concurrent.ConcurrentDictionary<,>).Assembly
+                    .Location)
             ],
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
 
@@ -381,14 +381,18 @@ public partial class TestClass
 ";
 
         var result = RunGenerator(source);
-        
+
         Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
         Assert.NotEmpty(result.GeneratedTrees);
 
         var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-        
-        Assert.Contains("partial class TestClass : global::HakoJS.SourceGeneration.IJSBindable<TestClass>, global::HakoJS.SourceGeneration.IJSMarshalable<TestClass>", generatedCode);
-        Assert.Contains("static global::HakoJS.VM.JSClass global::HakoJS.SourceGeneration.IJSBindable<TestClass>.CreatePrototype(global::HakoJS.VM.Realm realm)", generatedCode);
+
+        Assert.Contains(
+            "partial class TestClass : global::HakoJS.SourceGeneration.IJSBindable<TestClass>, global::HakoJS.SourceGeneration.IJSMarshalable<TestClass>",
+            generatedCode);
+        Assert.Contains(
+            "static global::HakoJS.VM.JSClass global::HakoJS.SourceGeneration.IJSBindable<TestClass>.CreatePrototype(global::HakoJS.VM.Realm realm)",
+            generatedCode);
         Assert.Contains("builder.SetConstructor", generatedCode);
         Assert.Contains("StoreInstance", generatedCode);
         Assert.Contains("GetInstance", generatedCode);
@@ -417,11 +421,11 @@ public partial class TestClass
 ";
 
         var result = RunGenerator(source);
-        
+
         Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-        
+
         var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-        
+
         Assert.Contains("AddReadWriteProperty(\"name\"", generatedCode);
         Assert.Contains("AddReadWriteProperty(\"customName\"", generatedCode);
         Assert.Contains("AddReadOnlyProperty(\"readOnlyProp\"", generatedCode);
@@ -450,11 +454,11 @@ public partial class TestClass
 ";
 
         var result = RunGenerator(source);
-        
+
         Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-        
+
         var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-        
+
         Assert.Contains("AddMethod(\"voidMethod\"", generatedCode);
         Assert.Contains("AddMethod(\"add\"", generatedCode);
         Assert.Contains("AddMethod(\"greet\"", generatedCode);
@@ -480,11 +484,11 @@ public partial class TestClass
 ";
 
         var result = RunGenerator(source);
-        
+
         Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-        
+
         var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-        
+
         Assert.Contains("AddReadWriteStaticProperty(\"staticProp\"", generatedCode);
         Assert.Contains("AddStaticMethod(\"staticMethod\"", generatedCode);
     }
@@ -523,11 +527,11 @@ public partial class TestClass
 ";
 
         var result = RunGenerator(source);
-        
+
         Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-        
+
         var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-        
+
         Assert.Contains("AddMethodAsync(\"asyncVoidMethod\"", generatedCode);
         Assert.Contains("AddMethodAsync(\"asyncStringMethod\"", generatedCode);
         Assert.Contains("AddMethodAsync(\"taskMethod\"", generatedCode);
@@ -550,15 +554,18 @@ public partial record UserProfile(string Name, int Age);
 ";
 
         var result = RunGenerator(source);
-        
+
         Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
         Assert.NotEmpty(result.GeneratedTrees);
 
         var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-        
-        Assert.Contains("partial record UserProfile : global::HakoJS.SourceGeneration.IJSMarshalable<UserProfile>", generatedCode);
+
+        Assert.Contains("partial record UserProfile : global::HakoJS.SourceGeneration.IJSMarshalable<UserProfile>",
+            generatedCode);
         Assert.Contains("public global::HakoJS.VM.JSValue ToJSValue(global::HakoJS.VM.Realm realm)", generatedCode);
-        Assert.Contains("public static UserProfile FromJSValue(global::HakoJS.VM.Realm realm, global::HakoJS.VM.JSValue jsValue)", generatedCode);
+        Assert.Contains(
+            "public static UserProfile FromJSValue(global::HakoJS.VM.Realm realm, global::HakoJS.VM.JSValue jsValue)",
+            generatedCode);
         Assert.Contains("obj.SetProperty(\"name\"", generatedCode);
         Assert.Contains("obj.SetProperty(\"age\"", generatedCode);
     }
@@ -581,11 +588,11 @@ public partial record UserProfile(
 ";
 
         var result = RunGenerator(source);
-        
+
         Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-        
+
         var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-        
+
         // Should handle optional parameters with default values
         Assert.Contains("if (emailProp.IsNullOrUndefined())", generatedCode);
         Assert.Contains("email = null", generatedCode);
@@ -608,11 +615,11 @@ public partial record ApiRequest(
 ";
 
         var result = RunGenerator(source);
-        
+
         Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-        
+
         var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-        
+
         Assert.Contains("\"api_key\"", generatedCode);
         Assert.Contains("\"user_id\"", generatedCode);
     }
@@ -634,20 +641,22 @@ public partial record EventConfig(
 ";
 
         var result = RunGenerator(source);
-        
+
         Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-        
+
         var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-        
+
         // Should implement IDisposable for delegate tracking
-        Assert.Contains(": global::HakoJS.SourceGeneration.IJSMarshalable<EventConfig>, global::HakoJS.SourceGeneration.IDefinitelyTyped<EventConfig>, global::System.IDisposable", generatedCode);
+        Assert.Contains(
+            ": global::HakoJS.SourceGeneration.IJSMarshalable<EventConfig>, global::HakoJS.SourceGeneration.IDefinitelyTyped<EventConfig>, global::System.IDisposable",
+            generatedCode);
         Assert.Contains("private global::HakoJS.VM.JSValue? _capturedOnEvent;", generatedCode);
         Assert.Contains("public void Dispose()", generatedCode);
-        
+
         // Should generate function wrapper in ToJSValue
         Assert.Contains("realm.NewFunction(\"onEvent\"", generatedCode);
         Assert.Contains("OnEvent(arg0)", generatedCode);
-        
+
         // Should generate delegate wrapper in FromJSValue
         Assert.Contains("new global::System.Action<", generatedCode);
         Assert.Contains("capturedOnEvent = onEventProp.Dup()", generatedCode);
@@ -670,14 +679,14 @@ public partial record Calculator(
 ";
 
         var result = RunGenerator(source);
-        
+
         Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-        
+
         var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-        
+
         // Should generate Func wrapper
         Assert.Contains("new global::System.Func<", generatedCode);
-        
+
         // Should handle return value marshaling
         Assert.Contains("var result = Add(", generatedCode);
         Assert.Contains("return", generatedCode);
@@ -701,17 +710,17 @@ public partial record AsyncConfig(
 ";
 
         var result = RunGenerator(source);
-    
+
         Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
+
         var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
+
         // ToJSValue: Should generate async function wrappers for C# delegates
         Assert.Contains("NewFunctionAsync", generatedCode);
         Assert.Contains("async (ctx, thisArg, args)", generatedCode);
         Assert.Contains("await FetchData", generatedCode);
         Assert.Contains("await Initialize", generatedCode);
-    
+
         // FromJSValue: Should handle promise awaiting when calling JS functions from C#
         Assert.Contains("await result.Await()", generatedCode);
     }
@@ -732,12 +741,12 @@ public partial record Person(string Name, Address HomeAddress);
 ";
 
         var result = RunGenerator(source);
-        
+
         Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
         Assert.Equal(13, result.GeneratedTrees.Length);
-        
+
         var personCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Person")).GetText().ToString();
-        
+
         // Should marshal nested record using ToJSValue/FromJSValue
         Assert.Contains("HomeAddress.ToJSValue(realm)", personCode);
         Assert.Contains("global::TestNamespace.Address.FromJSValue", personCode);
@@ -767,11 +776,11 @@ public partial record AllTypes(
 ";
 
         var result = RunGenerator(source);
-        
+
         Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-        
+
         var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-        
+
         // Should handle all types correctly
         Assert.Contains("stringVal", generatedCode);
         Assert.Contains("intVal", generatedCode);
@@ -802,7 +811,7 @@ public record NonPartialRecord(string Name);
 ";
 
         var result = RunGenerator(source);
-        
+
         var error = result.Diagnostics.FirstOrDefault(d => d.Id == "HAKO016");
         Assert.NotNull(error);
         Assert.Equal(DiagnosticSeverity.Error, error.Severity);
@@ -824,7 +833,7 @@ public partial class NotARecord
 ";
 
         var result = RunGenerator(source);
-        
+
         var error = result.Diagnostics.FirstOrDefault(d => d.Id == "HAKO017");
         Assert.NotNull(error);
         Assert.Equal(DiagnosticSeverity.Error, error.Severity);
@@ -845,7 +854,7 @@ public partial record ConflictingRecord(string Name);
 ";
 
         var result = RunGenerator(source);
-        
+
         var error = result.Diagnostics.FirstOrDefault(d => d.Id == "HAKO018");
         Assert.NotNull(error);
         Assert.Equal(DiagnosticSeverity.Error, error.Severity);
@@ -869,7 +878,7 @@ public partial record InvalidRecord(
 ";
 
         var result = RunGenerator(source);
-        
+
         var error = result.Diagnostics.FirstOrDefault(d => d.Id == "HAKO019");
         Assert.NotNull(error);
         Assert.Equal(DiagnosticSeverity.Error, error.Severity);
@@ -909,13 +918,13 @@ public partial record Transform(
 ";
 
         var result = RunGenerator(source);
-        
+
         // Should allow JSClass types in records
         Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
         Assert.Equal(13, result.GeneratedTrees.Length);
-        
+
         var transformCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Transform")).GetText().ToString();
-        
+
         // Should use ToJSValue/FromJSValue for Vector2
         Assert.Contains("Position.ToJSValue(realm)", transformCode);
         Assert.Contains("global::TestNamespace.Vector2.FromJSValue", transformCode);
@@ -940,7 +949,7 @@ public class NonPartialClass
 ";
 
         var result = RunGenerator(source);
-        
+
         var error = result.Diagnostics.FirstOrDefault(d => d.Id == "HAKO001");
         Assert.NotNull(error);
         Assert.Equal(DiagnosticSeverity.Error, error.Severity);
@@ -966,7 +975,7 @@ public class NonPartialModule
 ";
 
         var result = RunGenerator(source);
-        
+
         var error = result.Diagnostics.FirstOrDefault(d => d.Id == "HAKO002");
         Assert.NotNull(error);
         Assert.Equal(DiagnosticSeverity.Error, error.Severity);
@@ -996,7 +1005,7 @@ public partial class TestClass
 ";
 
         var result = RunGenerator(source);
-        
+
         var error = result.Diagnostics.FirstOrDefault(d => d.Id == "HAKO005");
         Assert.NotNull(error);
         Assert.Contains("same JavaScript name", error.GetMessage());
@@ -1023,7 +1032,7 @@ public partial class TestClass
 ";
 
         var result = RunGenerator(source);
-        
+
         var error = result.Diagnostics.FirstOrDefault(d => d.Id == "HAKO006");
         Assert.NotNull(error);
         Assert.Contains("Static attribute must match", error.GetMessage());
@@ -1053,7 +1062,7 @@ public partial class TestClass
 ";
 
         var result = RunGenerator(source);
-        
+
         var error = result.Diagnostics.FirstOrDefault(d => d.Id == "HAKO007");
         Assert.NotNull(error);
         Assert.Contains("same JavaScript name", error.GetMessage());
@@ -1080,7 +1089,7 @@ public partial class TestClass
 ";
 
         var result = RunGenerator(source);
-        
+
         var error = result.Diagnostics.FirstOrDefault(d => d.Id == "HAKO008");
         Assert.NotNull(error);
         Assert.Contains("Static attribute must match", error.GetMessage());
@@ -1108,7 +1117,7 @@ public partial class TestClass
 ";
 
         var result = RunGenerator(source);
-        
+
         var error = result.Diagnostics.FirstOrDefault(d => d.Id == "HAKO012");
         Assert.NotNull(error);
         Assert.Contains("cannot be marshaled", error.GetMessage());
@@ -1149,7 +1158,7 @@ public partial class TestClass
 ";
 
         var result = RunGenerator(source);
-        
+
         Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
     }
 
@@ -1175,7 +1184,7 @@ public partial class TestClass
 ";
 
         var result = RunGenerator(source);
-        
+
         var error = result.Diagnostics.FirstOrDefault(d => d.Id == "HAKO013");
         Assert.NotNull(error);
         Assert.Contains("cannot be marshaled", error.GetMessage());
@@ -1220,7 +1229,7 @@ public partial class TestClass
 ";
 
         var result = RunGenerator(source);
-        
+
         Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
     }
 
@@ -1248,12 +1257,12 @@ public partial class TestModule
 ";
 
         var result = RunGenerator(source);
-        
+
         Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
         Assert.NotEmpty(result.GeneratedTrees);
 
         var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-        
+
         Assert.Contains("partial class TestModule : global::HakoJS.SourceGeneration.IJSModuleBindable", generatedCode);
         Assert.Contains("public static string Name => \"TestModule\"", generatedCode);
         Assert.Contains("SetExport(\"version\"", generatedCode);
@@ -1282,11 +1291,11 @@ public partial class TestModule
 ";
 
         var result = RunGenerator(source);
-        
+
         Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-        
+
         var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-        
+
         Assert.Contains("async (ctx, thisArg, args)", generatedCode);
         Assert.Contains("await TestModule.FetchData", generatedCode);
     }
@@ -1315,7 +1324,7 @@ public partial class TestModule
 ";
 
         var result = RunGenerator(source);
-        
+
         var error = result.Diagnostics.FirstOrDefault(d => d.Id == "HAKO009");
         Assert.NotNull(error);
     }
@@ -1344,7 +1353,7 @@ public partial class TestModule
 ";
 
         var result = RunGenerator(source);
-        
+
         var error = result.Diagnostics.FirstOrDefault(d => d.Id == "HAKO010");
         Assert.NotNull(error);
     }
@@ -1373,7 +1382,7 @@ public partial class TestModule
 ";
 
         var result = RunGenerator(source);
-        
+
         var error = result.Diagnostics.FirstOrDefault(d => d.Id == "HAKO011");
         Assert.NotNull(error);
         Assert.Contains("Export names must be unique", error.GetMessage());
@@ -1401,7 +1410,7 @@ public partial class TestModule
 ";
 
         var result = RunGenerator(source);
-        
+
         var error = result.Diagnostics.FirstOrDefault(d => d.Id == "HAKO014");
         Assert.NotNull(error);
         Assert.Contains("cannot be marshaled", error.GetMessage());
@@ -1429,7 +1438,7 @@ public partial class TestModule
 ";
 
         var result = RunGenerator(source);
-        
+
         var error = result.Diagnostics.FirstOrDefault(d => d.Id == "HAKO015");
         Assert.NotNull(error);
         Assert.Contains("cannot be marshaled", error.GetMessage());
@@ -1465,11 +1474,11 @@ public partial class TestClass
 ";
 
         var result = RunGenerator(source);
-        
+
         Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-        
+
         var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-        
+
         // Check that nullable marshaling is generated
         Assert.Contains("HasValue", generatedCode);
         Assert.Contains(".Value", generatedCode);
@@ -1496,7 +1505,7 @@ public partial class TestClass
 ";
 
         var result = RunGenerator(source);
-        
+
         Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
     }
 
@@ -1533,11 +1542,11 @@ public partial class TestClass
 ";
 
         var result = RunGenerator(source);
-        
+
         Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-        
+
         var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-        
+
         // Check for array marshaling helpers
         Assert.Contains("ToJSArray", generatedCode);
         Assert.Contains("ToArray", generatedCode);
@@ -1570,11 +1579,11 @@ public partial class TestClass
 ";
 
         var result = RunGenerator(source);
-        
+
         Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-        
+
         var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-        
+
         // Check for optional parameter handling
         Assert.Contains("args.Length >", generatedCode);
     }
@@ -1607,11 +1616,11 @@ public partial class TestClass
 ";
 
         var result = RunGenerator(source);
-        
+
         Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-        
+
         var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-        
+
         Assert.Contains("builder.SetConstructor", generatedCode);
         Assert.Contains("new TestClass(name, value)", generatedCode);
     }
@@ -1632,11 +1641,11 @@ public partial class TestClass
 ";
 
         var result = RunGenerator(source);
-        
+
         Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-        
+
         var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-        
+
         Assert.Contains("builder.SetConstructor", generatedCode);
         Assert.Contains("new TestClass()", generatedCode);
     }
@@ -1660,11 +1669,11 @@ public partial class TestClass
 ";
 
         var result = RunGenerator(source);
-        
+
         Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-        
+
         var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-        
+
         Assert.Contains("public global::HakoJS.VM.JSValue ToJSValue(global::HakoJS.VM.Realm realm)", generatedCode);
         Assert.Contains("FromJSValue", generatedCode);
         Assert.Contains("global::HakoJS.SourceGeneration.IJSMarshalable<TestClass>", generatedCode);
@@ -1685,9 +1694,9 @@ public partial class TestClass
 ";
 
         var result = RunGenerator(source);
-        
+
         var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-        
+
         Assert.Contains("global::System.Collections.Concurrent.ConcurrentDictionary<int, TestClass>", generatedCode);
         Assert.Contains("global::System.Collections.Concurrent.ConcurrentDictionary<TestClass, int>", generatedCode);
         Assert.Contains("StoreInstance", generatedCode);
@@ -1724,11 +1733,11 @@ public partial class TestClass
 ";
 
         var result = RunGenerator(source);
-        
+
         Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-        
+
         var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-        
+
         Assert.DoesNotContain("ignoredProperty", generatedCode);
         Assert.DoesNotContain("ignoredMethod", generatedCode);
         Assert.Contains("includedProperty", generatedCode);
@@ -1765,7 +1774,7 @@ public partial class TestClass
 ";
 
         var result = RunGenerator(source);
-        
+
         // Should have no errors because CustomType implements IJSMarshalable
         Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
     }
@@ -1810,22 +1819,27 @@ public partial class Transform
 ";
 
         var result = RunGenerator(source);
-        
+
         // Should have no errors because Vector2 has [JSClass] and will implement IJSMarshalable
         Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-        
+
         // Should generate code for both classes
         Assert.Equal(13, result.GeneratedTrees.Length);
-        
+
         // Verify Vector2 generation
         var vector2Code = result.GeneratedTrees.First(t => t.FilePath.Contains("Vector2")).GetText().ToString();
-        Assert.Contains("partial class Vector2 : global::HakoJS.SourceGeneration.IJSBindable<Vector2>, global::HakoJS.SourceGeneration.IJSMarshalable<Vector2>", vector2Code);
+        Assert.Contains(
+            "partial class Vector2 : global::HakoJS.SourceGeneration.IJSBindable<Vector2>, global::HakoJS.SourceGeneration.IJSMarshalable<Vector2>",
+            vector2Code);
         Assert.Contains("public global::HakoJS.VM.JSValue ToJSValue(global::HakoJS.VM.Realm realm)", vector2Code);
-        Assert.Contains("public static Vector2 FromJSValue(global::HakoJS.VM.Realm realm, global::HakoJS.VM.JSValue jsValue)", vector2Code);
-        
+        Assert.Contains(
+            "public static Vector2 FromJSValue(global::HakoJS.VM.Realm realm, global::HakoJS.VM.JSValue jsValue)",
+            vector2Code);
+
         // Verify Transform generation with Vector2 marshaling
         var transformCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Transform")).GetText().ToString();
-        Assert.Contains("partial class Transform : global::HakoJS.SourceGeneration.IJSBindable<Transform>", transformCode);
+        Assert.Contains("partial class Transform : global::HakoJS.SourceGeneration.IJSBindable<Transform>",
+            transformCode);
         // Should marshal Vector2 using .ToJSValue()
         Assert.Contains(".ToJSValue(ctx)", transformCode);
     }
@@ -1863,11 +1877,11 @@ public partial class Vector2
 ";
 
         var result = RunGenerator(source);
-        
+
         Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-        
+
         var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-        
+
         // Should use FromJSValue for unmarshaling parameters
         Assert.Contains("FromJSValue", generatedCode);
     }
@@ -1939,12 +1953,12 @@ public partial class ComplexClass
 ";
 
         var result = RunGenerator(source);
-        
+
         Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
         Assert.NotEmpty(result.GeneratedTrees);
 
         var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-        
+
         // Verify all features are present
         Assert.Contains("partial class ComplexClass", generatedCode);
         Assert.Contains("global::HakoJS.SourceGeneration.IJSBindable<ComplexClass>", generatedCode);
@@ -1981,26 +1995,26 @@ public partial record ComplexConfig(
 ";
 
         var result = RunGenerator(source);
-        
+
         Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
         Assert.NotEmpty(result.GeneratedTrees);
 
         var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-        
+
         // Verify record generation
         Assert.Contains("partial record ComplexConfig", generatedCode);
         Assert.Contains("global::HakoJS.SourceGeneration.IJSMarshalable<ComplexConfig>", generatedCode);
         Assert.Contains("global::System.IDisposable", generatedCode);
-        
+
         // Verify delegate handling
         Assert.Contains("NewFunction", generatedCode);
         Assert.Contains("NewFunctionAsync", generatedCode);
         Assert.Contains("global::System.Action<", generatedCode);
         Assert.Contains("global::System.Func<", generatedCode);
-        
+
         // Verify custom property name
         Assert.Contains("\"custom_field\"", generatedCode);
-        
+
         // Verify disposal
         Assert.Contains("public void Dispose()", generatedCode);
         Assert.Contains("_capturedOnEvent", generatedCode);
@@ -2032,9 +2046,9 @@ public partial class TestClass
 ";
 
         var result = RunGenerator(source);
-        
+
         var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-        
+
         Assert.Contains("\"myProperty\"", generatedCode);
         Assert.Contains("\"myMethod\"", generatedCode);
     }
@@ -2059,21 +2073,21 @@ public partial class TestClass
 ";
 
         var result = RunGenerator(source);
-        
+
         var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-        
+
         Assert.Contains("\"custom_prop\"", generatedCode);
         Assert.Contains("\"custom_method\"", generatedCode);
     }
 
     #endregion
-    
+
     #region Delegate Parameter Naming Tests
 
-[Fact]
-public void UsesNamedDelegateParameterNames()
-{
-    var source = @"
+    [Fact]
+    public void UsesNamedDelegateParameterNames()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 using System;
 
@@ -2089,30 +2103,30 @@ public partial record Calculator(
 );
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // Should use actual parameter names from named delegate
-    Assert.Contains("var x =", generatedCode);
-    Assert.Contains("var y =", generatedCode);
-    Assert.Contains("Add(x, y)", generatedCode);
-    
-    Assert.Contains("var firstName =", generatedCode);
-    Assert.Contains("var lastName =", generatedCode);
-    Assert.Contains("Format(firstName, lastName)", generatedCode);
-    
-    // Should NOT use generic arg0, arg1 for named delegates
-    Assert.DoesNotContain("Add(arg0, arg1)", generatedCode);
-    Assert.DoesNotContain("Format(arg0, arg1)", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void UsesFuncActionGenericParameterNames()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        // Should use actual parameter names from named delegate
+        Assert.Contains("var x =", generatedCode);
+        Assert.Contains("var y =", generatedCode);
+        Assert.Contains("Add(x, y)", generatedCode);
+
+        Assert.Contains("var firstName =", generatedCode);
+        Assert.Contains("var lastName =", generatedCode);
+        Assert.Contains("Format(firstName, lastName)", generatedCode);
+
+        // Should NOT use generic arg0, arg1 for named delegates
+        Assert.DoesNotContain("Add(arg0, arg1)", generatedCode);
+        Assert.DoesNotContain("Format(arg0, arg1)", generatedCode);
+    }
+
+    [Fact]
+    public void UsesFuncActionGenericParameterNames()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 using System;
 
@@ -2126,27 +2140,27 @@ public partial record Calculator(
 );
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // Should use generic arg0, arg1, etc. for Func/Action
-    Assert.Contains("var arg0 =", generatedCode);
-    Assert.Contains("var arg1 =", generatedCode);
-    Assert.Contains("Add(arg0, arg1)", generatedCode);
-    
-    Assert.Contains("Log(arg0, arg1)", generatedCode);
-    
-    Assert.Contains("var arg2 =", generatedCode);
-    Assert.Contains("Calculate(arg0, arg1, arg2)", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void UsesNamedDelegateParameterNamesInFromJSValue()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        // Should use generic arg0, arg1, etc. for Func/Action
+        Assert.Contains("var arg0 =", generatedCode);
+        Assert.Contains("var arg1 =", generatedCode);
+        Assert.Contains("Add(arg0, arg1)", generatedCode);
+
+        Assert.Contains("Log(arg0, arg1)", generatedCode);
+
+        Assert.Contains("var arg2 =", generatedCode);
+        Assert.Contains("Calculate(arg0, arg1, arg2)", generatedCode);
+    }
+
+    [Fact]
+    public void UsesNamedDelegateParameterNamesInFromJSValue()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 using System;
 
@@ -2160,27 +2174,27 @@ public partial record Config(
 );
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // In FromJSValue, should create delegate with actual parameter names
-    Assert.Contains("int value", generatedCode);
-    Assert.Contains("string context", generatedCode);
-    Assert.Contains("using var valueJs = realm.NewValue(value)", generatedCode);
-    Assert.Contains("using var contextJs = realm.NewValue(context)", generatedCode);
-    
-    // Should NOT use generic names
-    Assert.DoesNotContain("int arg0", generatedCode);
-    Assert.DoesNotContain("string arg1", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void UsesFuncActionGenericParameterNamesInFromJSValue()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        // In FromJSValue, should create delegate with actual parameter names
+        Assert.Contains("int value", generatedCode);
+        Assert.Contains("string context", generatedCode);
+        Assert.Contains("using var valueJs = realm.NewValue(value)", generatedCode);
+        Assert.Contains("using var contextJs = realm.NewValue(context)", generatedCode);
+
+        // Should NOT use generic names
+        Assert.DoesNotContain("int arg0", generatedCode);
+        Assert.DoesNotContain("string arg1", generatedCode);
+    }
+
+    [Fact]
+    public void UsesFuncActionGenericParameterNamesInFromJSValue()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 using System;
 
@@ -2192,23 +2206,23 @@ public partial record Config(
 );
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // In FromJSValue, should use generic arg0, arg1 for Func
-    Assert.Contains("string arg0", generatedCode);
-    Assert.Contains("int arg1", generatedCode);
-    Assert.Contains("using var arg0Js = realm.NewValue(arg0)", generatedCode);
-    Assert.Contains("using var arg1Js = realm.NewValue(arg1)", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void UsesNamedDelegateParameterNamesWithOptionalParameters()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        // In FromJSValue, should use generic arg0, arg1 for Func
+        Assert.Contains("string arg0", generatedCode);
+        Assert.Contains("int arg1", generatedCode);
+        Assert.Contains("using var arg0Js = realm.NewValue(arg0)", generatedCode);
+        Assert.Contains("using var arg1Js = realm.NewValue(arg1)", generatedCode);
+    }
+
+    [Fact]
+    public void UsesNamedDelegateParameterNamesWithOptionalParameters()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 using System;
 
@@ -2222,27 +2236,27 @@ public partial record Config(
 );
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // Should use actual parameter names with defaults
-    Assert.Contains("var x =", generatedCode);
-    Assert.Contains("var y =", generatedCode);
-    Assert.Contains("var z =", generatedCode);
-    Assert.Contains("Calculate(x, y, z)", generatedCode);
-    
-    // Should handle optional parameters
-    Assert.Contains("args.Length > 1", generatedCode);
-    Assert.Contains("args.Length > 2", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void MixesNamedDelegatesAndFuncAction()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        // Should use actual parameter names with defaults
+        Assert.Contains("var x =", generatedCode);
+        Assert.Contains("var y =", generatedCode);
+        Assert.Contains("var z =", generatedCode);
+        Assert.Contains("Calculate(x, y, z)", generatedCode);
+
+        // Should handle optional parameters
+        Assert.Contains("args.Length > 1", generatedCode);
+        Assert.Contains("args.Length > 2", generatedCode);
+    }
+
+    [Fact]
+    public void MixesNamedDelegatesAndFuncAction()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 using System;
 using System.Threading.Tasks;
@@ -2261,33 +2275,33 @@ public partial record MixedConfig(
 );
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // Named delegate Logger should use actual names
-    Assert.Contains("var message =", generatedCode);
-    Assert.Contains("var level =", generatedCode);
-    Assert.Contains("Log(message, level)", generatedCode);
-    
-    // Func should use generic names
-    Assert.Contains("Add(arg0, arg1)", generatedCode);
-    
-    // Named async delegate should use actual names
-    Assert.Contains("var url =", generatedCode);
-    Assert.Contains("var timeout =", generatedCode);
-    Assert.Contains("await Fetch(url, timeout)", generatedCode);
-    
-    // Action should use generic name
-    Assert.Contains("Notify(arg0)", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void HandlesNamedDelegateWithComplexParameterTypes()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        // Named delegate Logger should use actual names
+        Assert.Contains("var message =", generatedCode);
+        Assert.Contains("var level =", generatedCode);
+        Assert.Contains("Log(message, level)", generatedCode);
+
+        // Func should use generic names
+        Assert.Contains("Add(arg0, arg1)", generatedCode);
+
+        // Named async delegate should use actual names
+        Assert.Contains("var url =", generatedCode);
+        Assert.Contains("var timeout =", generatedCode);
+        Assert.Contains("await Fetch(url, timeout)", generatedCode);
+
+        // Action should use generic name
+        Assert.Contains("Notify(arg0)", generatedCode);
+    }
+
+    [Fact]
+    public void HandlesNamedDelegateWithComplexParameterTypes()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 using System;
 
@@ -2301,23 +2315,23 @@ public partial record Config(
 );
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // Should use actual parameter names even with complex types
-    Assert.Contains("int? value", generatedCode);
-    Assert.Contains("string[] tags", generatedCode);
-    Assert.Contains("double threshold", generatedCode);
-    Assert.Contains("Validate(value, tags, threshold)", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void ValidatesNamedDelegateParameterNamesInErrorMessages()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        // Should use actual parameter names even with complex types
+        Assert.Contains("int? value", generatedCode);
+        Assert.Contains("string[] tags", generatedCode);
+        Assert.Contains("double threshold", generatedCode);
+        Assert.Contains("Validate(value, tags, threshold)", generatedCode);
+    }
+
+    [Fact]
+    public void ValidatesNamedDelegateParameterNamesInErrorMessages()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 using System;
 
@@ -2331,21 +2345,21 @@ public partial record Calculator(
 );
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // Error messages should use the actual parameter names
-    Assert.Contains("\"Parameter 'firstNumber'", generatedCode);
-    Assert.Contains("\"Parameter 'secondNumber'", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void ValidatesFuncActionParameterNamesInErrorMessages()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        // Error messages should use the actual parameter names
+        Assert.Contains("\"Parameter 'firstNumber'", generatedCode);
+        Assert.Contains("\"Parameter 'secondNumber'", generatedCode);
+    }
+
+    [Fact]
+    public void ValidatesFuncActionParameterNamesInErrorMessages()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 using System;
 
@@ -2357,27 +2371,27 @@ public partial record Calculator(
 );
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // Error messages should use generic parameter names for Func/Action
-    Assert.Contains("\"Parameter 'arg0'", generatedCode);
-    Assert.Contains("\"Parameter 'arg1'", generatedCode);
-}
+        var result = RunGenerator(source);
 
-#endregion
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        // Error messages should use generic parameter names for Func/Action
+        Assert.Contains("\"Parameter 'arg0'", generatedCode);
+        Assert.Contains("\"Parameter 'arg1'", generatedCode);
+    }
+
+    #endregion
 
 // Add these tests to the JSBindingGeneratorTests class
 
-#region TypeScript Definition Tests - Classes
+    #region TypeScript Definition Tests - Classes
 
-[Fact]
-public void GeneratesTypeScriptDefinitionForBasicClass()
-{
-    var source = @"
+    [Fact]
+    public void GeneratesTypeScriptDefinitionForBasicClass()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -2396,29 +2410,29 @@ public partial class TestClass
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // Should implement IDefinitelyTyped
-    Assert.Contains("global::HakoJS.SourceGeneration.IDefinitelyTyped<TestClass>", generatedCode);
-    
-    // Should have TypeDefinition property
-    Assert.Contains("public static string TypeDefinition", generatedCode);
-    
-    // Should contain class declaration
-    Assert.Contains("declare class MyClass {", generatedCode);
-    Assert.Contains("constructor();", generatedCode);
-    Assert.Contains("name: string;", generatedCode);
-    Assert.Contains("getValue(): number;", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTypeScriptDefinitionWithReadOnlyProperties()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        // Should implement IDefinitelyTyped
+        Assert.Contains("global::HakoJS.SourceGeneration.IDefinitelyTyped<TestClass>", generatedCode);
+
+        // Should have TypeDefinition property
+        Assert.Contains("public static string TypeDefinition", generatedCode);
+
+        // Should contain class declaration
+        Assert.Contains("declare class MyClass {", generatedCode);
+        Assert.Contains("constructor();", generatedCode);
+        Assert.Contains("name: string;", generatedCode);
+        Assert.Contains("getValue(): number;", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTypeScriptDefinitionWithReadOnlyProperties()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -2434,21 +2448,21 @@ public partial class TestClass
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    Assert.Contains("readonly readOnlyProp: string;", generatedCode);
-    Assert.Contains("writableProp: number;", generatedCode);
-    Assert.DoesNotContain("readonly writableProp", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTypeScriptDefinitionWithStaticMembers()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        Assert.Contains("readonly readOnlyProp: string;", generatedCode);
+        Assert.Contains("writableProp: number;", generatedCode);
+        Assert.DoesNotContain("readonly writableProp", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTypeScriptDefinitionWithStaticMembers()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -2470,22 +2484,22 @@ public partial class TestClass
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    Assert.Contains("static staticProp: string;", generatedCode);
-    Assert.Contains("static staticMethod(): number;", generatedCode);
-    Assert.DoesNotContain("static instanceProp", generatedCode);
-    Assert.DoesNotContain("static instanceMethod", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTypeScriptDefinitionWithAsyncMethods()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        Assert.Contains("static staticProp: string;", generatedCode);
+        Assert.Contains("static staticMethod(): number;", generatedCode);
+        Assert.DoesNotContain("static instanceProp", generatedCode);
+        Assert.DoesNotContain("static instanceMethod", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTypeScriptDefinitionWithAsyncMethods()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 using System.Threading.Tasks;
 
@@ -2515,21 +2529,21 @@ public partial class TestClass
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    Assert.Contains("asyncVoid(): Promise<void>;", generatedCode);
-    Assert.Contains("asyncString(): Promise<string>;", generatedCode);
-    Assert.Contains("taskInt(): Promise<number>;", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTypeScriptDefinitionWithOptionalParameters()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        Assert.Contains("asyncVoid(): Promise<void>;", generatedCode);
+        Assert.Contains("asyncString(): Promise<string>;", generatedCode);
+        Assert.Contains("taskInt(): Promise<number>;", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTypeScriptDefinitionWithOptionalParameters()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -2548,20 +2562,20 @@ public partial class TestClass
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    Assert.Contains("add(a: number, b?: number): number;", generatedCode);
-    Assert.Contains("format(text: string, uppercase?: boolean, prefix?: string): string;", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTypeScriptDefinitionWithArrayTypes()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        Assert.Contains("add(a: number, b?: number): number;", generatedCode);
+        Assert.Contains("format(text: string, uppercase?: boolean, prefix?: string): string;", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTypeScriptDefinitionWithArrayTypes()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -2583,22 +2597,22 @@ public partial class TestClass
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    Assert.Contains("numbers: number[];", generatedCode);
-    Assert.Contains("strings: string[];", generatedCode);
-    Assert.Contains("getDoubles(): number[];", generatedCode);
-    Assert.Contains("processArray(flags: boolean[]): void;", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTypeScriptDefinitionWithNullableTypes()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        Assert.Contains("numbers: number[];", generatedCode);
+        Assert.Contains("strings: string[];", generatedCode);
+        Assert.Contains("getDoubles(): number[];", generatedCode);
+        Assert.Contains("processArray(flags: boolean[]): void;", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTypeScriptDefinitionWithNullableTypes()
+    {
+        var source = @"
 #nullable enable
 using HakoJS.SourceGeneration;
 
@@ -2621,22 +2635,22 @@ public partial class TestClass
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    Assert.Contains("nullableString: string | null;", generatedCode);
-    Assert.Contains("nullableInt: number | null;", generatedCode);
-    Assert.Contains("nullableDouble: number | null;", generatedCode);
-    Assert.Contains("getNullableString(value: number | null): string | null;", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTypeScriptDefinitionWithByteArray()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        Assert.Contains("nullableString: string | null;", generatedCode);
+        Assert.Contains("nullableInt: number | null;", generatedCode);
+        Assert.Contains("nullableDouble: number | null;", generatedCode);
+        Assert.Contains("getNullableString(value: number | null): string | null;", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTypeScriptDefinitionWithByteArray()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -2655,21 +2669,21 @@ public partial class TestClass
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    Assert.Contains("buffer: ArrayBuffer;", generatedCode);
-    Assert.Contains("getBuffer(): ArrayBuffer;", generatedCode);
-    Assert.Contains("setBuffer(data: ArrayBuffer): void;", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTypeScriptDefinitionWithTypedArrays()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        Assert.Contains("buffer: ArrayBuffer;", generatedCode);
+        Assert.Contains("getBuffer(): ArrayBuffer;", generatedCode);
+        Assert.Contains("setBuffer(data: ArrayBuffer): void;", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTypeScriptDefinitionWithTypedArrays()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -2691,22 +2705,22 @@ public partial class TestClass
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    Assert.Contains("uint8Data: Uint8Array;", generatedCode);
-    Assert.Contains("int32Data: Int32Array;", generatedCode);
-    Assert.Contains("float64Data: Float64Array;", generatedCode);
-    Assert.Contains("getUint16(): Uint16Array;", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTypeScriptDefinitionWithCustomJSClassType()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        Assert.Contains("uint8Data: Uint8Array;", generatedCode);
+        Assert.Contains("int32Data: Int32Array;", generatedCode);
+        Assert.Contains("float64Data: Float64Array;", generatedCode);
+        Assert.Contains("getUint16(): Uint16Array;", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTypeScriptDefinitionWithCustomJSClassType()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -2732,25 +2746,25 @@ public partial class Transform
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var transformCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Transform")).GetText().ToString();
-    
-    // Should reference the custom type by its simple name
-    Assert.Contains("position: Vector2;", transformCode);
-    Assert.Contains("getPosition(): Vector2;", transformCode);
-}
+        var result = RunGenerator(source);
 
-#endregion
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
 
-#region TypeScript Definition Tests - Modules
+        var transformCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Transform")).GetText().ToString();
 
-[Fact]
-public void GeneratesTypeScriptDefinitionForBasicModule()
-{
-    var source = @"
+        // Should reference the custom type by its simple name
+        Assert.Contains("position: Vector2;", transformCode);
+        Assert.Contains("getPosition(): Vector2;", transformCode);
+    }
+
+    #endregion
+
+    #region TypeScript Definition Tests - Modules
+
+    [Fact]
+    public void GeneratesTypeScriptDefinitionForBasicModule()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -2766,25 +2780,25 @@ public partial class MyModule
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // Should implement IDefinitelyTyped
-    Assert.Contains("global::HakoJS.SourceGeneration.IDefinitelyTyped<MyModule>", generatedCode);
-    
-    // Should have module declaration
-    Assert.Contains("declare module 'myModule' {", generatedCode);
-    Assert.Contains("export const version: string;", generatedCode);
-    Assert.Contains("export function add(a: number, b: number): number;", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTypeScriptDefinitionForModuleWithAsyncMethods()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        // Should implement IDefinitelyTyped
+        Assert.Contains("global::HakoJS.SourceGeneration.IDefinitelyTyped<MyModule>", generatedCode);
+
+        // Should have module declaration
+        Assert.Contains("declare module 'myModule' {", generatedCode);
+        Assert.Contains("export const version: string;", generatedCode);
+        Assert.Contains("export function add(a: number, b: number): number;", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTypeScriptDefinitionForModuleWithAsyncMethods()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 using System.Threading.Tasks;
 
@@ -2808,20 +2822,20 @@ public partial class MyModule
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    Assert.Contains("export function fetchData(): Promise<string>;", generatedCode);
-    Assert.Contains("export function getCount(): Promise<number>;", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTypeScriptDefinitionForModuleWithOptionalParameters()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        Assert.Contains("export function fetchData(): Promise<string>;", generatedCode);
+        Assert.Contains("export function getCount(): Promise<number>;", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTypeScriptDefinitionForModuleWithOptionalParameters()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -2843,20 +2857,20 @@ public partial class MyModule
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    Assert.Contains("export function format(text: string, uppercase?: boolean): string;", generatedCode);
-    Assert.Contains("export function calculate(x: number, y?: number, z?: number): number;", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTypeScriptDefinitionForModuleWithExportedClasses()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        Assert.Contains("export function format(text: string, uppercase?: boolean): string;", generatedCode);
+        Assert.Contains("export function calculate(x: number, y?: number, z?: number): number;", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTypeScriptDefinitionForModuleWithExportedClasses()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -2877,24 +2891,24 @@ public partial class MyModule
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
-    
-    Assert.Contains("declare module 'MyModule' {", moduleCode);
-    Assert.Contains("export class MyClass {", moduleCode);
-    Assert.Contains("constructor();", moduleCode);
-    Assert.Contains("name: string;", moduleCode);
-    Assert.Contains("}", moduleCode);
-    Assert.Contains("export const version: string;", moduleCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTypeScriptDefinitionForModuleWithNullableTypes()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
+
+        Assert.Contains("declare module 'MyModule' {", moduleCode);
+        Assert.Contains("export class MyClass {", moduleCode);
+        Assert.Contains("constructor();", moduleCode);
+        Assert.Contains("name: string;", moduleCode);
+        Assert.Contains("}", moduleCode);
+        Assert.Contains("export const version: string;", moduleCode);
+    }
+
+    [Fact]
+    public void GeneratesTypeScriptDefinitionForModuleWithNullableTypes()
+    {
+        var source = @"
 #nullable enable
 using HakoJS.SourceGeneration;
 
@@ -2911,24 +2925,24 @@ public partial class MyModule
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    Assert.Contains("export const nullableValue: string | null;", generatedCode);
-    Assert.Contains("export function getNullable(input: number | null): string | null;", generatedCode);
-}
+        var result = RunGenerator(source);
 
-#endregion
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
 
-#region TypeScript Definition Tests - Objects/Records
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
 
-[Fact]
-public void GeneratesTypeScriptDefinitionForBasicRecord()
-{
-    var source = @"
+        Assert.Contains("export const nullableValue: string | null;", generatedCode);
+        Assert.Contains("export function getNullable(input: number | null): string | null;", generatedCode);
+    }
+
+    #endregion
+
+    #region TypeScript Definition Tests - Objects/Records
+
+    [Fact]
+    public void GeneratesTypeScriptDefinitionForBasicRecord()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -2937,26 +2951,26 @@ namespace TestNamespace;
 public partial record UserProfile(string Name, int Age, string Email);
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // Should implement IDefinitelyTyped
-    Assert.Contains("global::HakoJS.SourceGeneration.IDefinitelyTyped<UserProfile>", generatedCode);
-    
-    // Should have interface definition
-    Assert.Contains("interface UserProfile {", generatedCode);
-    Assert.Contains("name: string;", generatedCode);
-    Assert.Contains("age: number;", generatedCode);
-    Assert.Contains("email: string;", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTypeScriptDefinitionForRecordWithOptionalParameters()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        // Should implement IDefinitelyTyped
+        Assert.Contains("global::HakoJS.SourceGeneration.IDefinitelyTyped<UserProfile>", generatedCode);
+
+        // Should have interface definition
+        Assert.Contains("interface UserProfile {", generatedCode);
+        Assert.Contains("name: string;", generatedCode);
+        Assert.Contains("age: number;", generatedCode);
+        Assert.Contains("email: string;", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTypeScriptDefinitionForRecordWithOptionalParameters()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -2970,22 +2984,22 @@ public partial record Config(
 );
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    Assert.Contains("name: string;", generatedCode);
-    Assert.Contains("port?: number;", generatedCode);
-    Assert.Contains("host?: string | null;", generatedCode);
-    Assert.Contains("enabled?: boolean;", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTypeScriptDefinitionForRecordWithCustomPropertyNames()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        Assert.Contains("name: string;", generatedCode);
+        Assert.Contains("port?: number;", generatedCode);
+        Assert.Contains("host?: string | null;", generatedCode);
+        Assert.Contains("enabled?: boolean;", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTypeScriptDefinitionForRecordWithCustomPropertyNames()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -2997,22 +3011,22 @@ public partial record ApiRequest(
 );
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    Assert.Contains("api_key: string;", generatedCode);
-    Assert.Contains("user_id: number;", generatedCode);
-    Assert.DoesNotContain("apiKey:", generatedCode);
-    Assert.DoesNotContain("userId:", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTypeScriptDefinitionForRecordWithActionDelegate()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        Assert.Contains("api_key: string;", generatedCode);
+        Assert.Contains("user_id: number;", generatedCode);
+        Assert.DoesNotContain("apiKey:", generatedCode);
+        Assert.DoesNotContain("userId:", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTypeScriptDefinitionForRecordWithActionDelegate()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 using System;
 
@@ -3026,21 +3040,21 @@ public partial record EventConfig(
 );
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    Assert.Contains("eventName: string;", generatedCode);
-    Assert.Contains("onEvent: (arg0: string) => void;", generatedCode);
-    Assert.Contains("onData: (arg0: number, arg1: boolean) => void;", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTypeScriptDefinitionForRecordWithFuncDelegate()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        Assert.Contains("eventName: string;", generatedCode);
+        Assert.Contains("onEvent: (arg0: string) => void;", generatedCode);
+        Assert.Contains("onData: (arg0: number, arg1: boolean) => void;", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTypeScriptDefinitionForRecordWithFuncDelegate()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 using System;
 
@@ -3054,21 +3068,21 @@ public partial record Calculator(
 );
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    Assert.Contains("add: (arg0: number, arg1: number) => number;", generatedCode);
-    Assert.Contains("validate: (arg0: string) => boolean;", generatedCode);
-    Assert.Contains("getValue: () => number;", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTypeScriptDefinitionForRecordWithNamedDelegate()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        Assert.Contains("add: (arg0: number, arg1: number) => number;", generatedCode);
+        Assert.Contains("validate: (arg0: string) => boolean;", generatedCode);
+        Assert.Contains("getValue: () => number;", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTypeScriptDefinitionForRecordWithNamedDelegate()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 using System;
 
@@ -3084,20 +3098,20 @@ public partial record Config(
 );
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    Assert.Contains("validate: (input: string, maxLength: number) => boolean;", generatedCode);
-    Assert.Contains("format: (firstName: string, lastName: string) => string;", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTypeScriptDefinitionForRecordWithAsyncDelegates()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        Assert.Contains("validate: (input: string, maxLength: number) => boolean;", generatedCode);
+        Assert.Contains("format: (firstName: string, lastName: string) => string;", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTypeScriptDefinitionForRecordWithAsyncDelegates()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 using System;
 using System.Threading.Tasks;
@@ -3112,21 +3126,21 @@ public partial record AsyncConfig(
 );
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    Assert.Contains("fetchData: (arg0: string) => Promise<number>;", generatedCode);
-    Assert.Contains("initialize: () => Promise<void>;", generatedCode);
-    Assert.Contains("validate: (arg0: number, arg1: number) => Promise<boolean>;", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTypeScriptDefinitionForRecordWithOptionalDelegates()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        Assert.Contains("fetchData: (arg0: string) => Promise<number>;", generatedCode);
+        Assert.Contains("initialize: () => Promise<void>;", generatedCode);
+        Assert.Contains("validate: (arg0: number, arg1: number) => Promise<boolean>;", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTypeScriptDefinitionForRecordWithOptionalDelegates()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 using System;
 
@@ -3140,21 +3154,21 @@ public partial record Config(
 );
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    Assert.Contains("name: string;", generatedCode);
-    Assert.Contains("onChange?: (arg0: string) => void;", generatedCode);
-    Assert.Contains("validator?: (arg0: number) => boolean;", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTypeScriptDefinitionForRecordWithArrayTypes()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        Assert.Contains("name: string;", generatedCode);
+        Assert.Contains("onChange?: (arg0: string) => void;", generatedCode);
+        Assert.Contains("validator?: (arg0: number) => boolean;", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTypeScriptDefinitionForRecordWithArrayTypes()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -3168,22 +3182,22 @@ public partial record DataSet(
 );
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    Assert.Contains("numbers: number[];", generatedCode);
-    Assert.Contains("tags: string[];", generatedCode);
-    Assert.Contains("buffer: ArrayBuffer;", generatedCode);
-    Assert.Contains("optionalValues?: number[] | null;", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTypeScriptDefinitionForRecordWithTypedArrays()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        Assert.Contains("numbers: number[];", generatedCode);
+        Assert.Contains("tags: string[];", generatedCode);
+        Assert.Contains("buffer: ArrayBuffer;", generatedCode);
+        Assert.Contains("optionalValues?: number[] | null;", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTypeScriptDefinitionForRecordWithTypedArrays()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -3196,21 +3210,21 @@ public partial record TypedArrayData(
 );
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    Assert.Contains("uint8: Uint8Array;", generatedCode);
-    Assert.Contains("float32: Float32Array;", generatedCode);
-    Assert.Contains("optionalInt32?: Int32Array | null;", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTypeScriptDefinitionForRecordWithNestedRecord()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        Assert.Contains("uint8: Uint8Array;", generatedCode);
+        Assert.Contains("float32: Float32Array;", generatedCode);
+        Assert.Contains("optionalInt32?: Int32Array | null;", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTypeScriptDefinitionForRecordWithNestedRecord()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -3222,28 +3236,28 @@ public partial record Address(string Street, string City);
 public partial record Person(string Name, Address HomeAddress);
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var addressCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Address")).GetText().ToString();
-    var personCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Person")).GetText().ToString();
-    
-    // Address interface
-    Assert.Contains("interface Address {", addressCode);
-    Assert.Contains("street: string;", addressCode);
-    Assert.Contains("city: string;", addressCode);
-    
-    // Person interface with Address type
-    Assert.Contains("interface Person {", personCode);
-    Assert.Contains("name: string;", personCode);
-    Assert.Contains("homeAddress: Address;", personCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTypeScriptDefinitionForRecordWithAllPrimitiveTypes()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var addressCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Address")).GetText().ToString();
+        var personCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Person")).GetText().ToString();
+
+        // Address interface
+        Assert.Contains("interface Address {", addressCode);
+        Assert.Contains("street: string;", addressCode);
+        Assert.Contains("city: string;", addressCode);
+
+        // Person interface with Address type
+        Assert.Contains("interface Person {", personCode);
+        Assert.Contains("name: string;", personCode);
+        Assert.Contains("homeAddress: Address;", personCode);
+    }
+
+    [Fact]
+    public void GeneratesTypeScriptDefinitionForRecordWithAllPrimitiveTypes()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -3263,28 +3277,28 @@ public partial record AllTypes(
 );
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    Assert.Contains("stringVal: string;", generatedCode);
-    Assert.Contains("intVal: number;", generatedCode);
-    Assert.Contains("longVal: number;", generatedCode);
-    Assert.Contains("shortVal: number;", generatedCode);
-    Assert.Contains("byteVal: number;", generatedCode);
-    Assert.Contains("doubleVal: number;", generatedCode);
-    Assert.Contains("floatVal: number;", generatedCode);
-    Assert.Contains("boolVal: boolean;", generatedCode);
-    Assert.Contains("nullableInt: number | null;", generatedCode);
-    Assert.Contains("nullableString: string | null;", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTypeScriptDefinitionForComplexRecord()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        Assert.Contains("stringVal: string;", generatedCode);
+        Assert.Contains("intVal: number;", generatedCode);
+        Assert.Contains("longVal: number;", generatedCode);
+        Assert.Contains("shortVal: number;", generatedCode);
+        Assert.Contains("byteVal: number;", generatedCode);
+        Assert.Contains("doubleVal: number;", generatedCode);
+        Assert.Contains("floatVal: number;", generatedCode);
+        Assert.Contains("boolVal: boolean;", generatedCode);
+        Assert.Contains("nullableInt: number | null;", generatedCode);
+        Assert.Contains("nullableString: string | null;", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTypeScriptDefinitionForComplexRecord()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 using System;
 using System.Threading.Tasks;
@@ -3306,31 +3320,31 @@ public partial record ComplexConfig(
 );
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    Assert.Contains("interface ComplexConfig {", generatedCode);
-    Assert.Contains("name: string;", generatedCode);
-    Assert.Contains("port: number;", generatedCode);
-    Assert.Contains("onStart: (arg0: string) => void;", generatedCode);
-    Assert.Contains("validator: (arg0: number) => Promise<boolean>;", generatedCode);
-    Assert.Contains("log: (message: string, level: number) => void;", generatedCode);
-    Assert.Contains("allowedPorts: number[];", generatedCode);
-    Assert.Contains("host?: string | null;", generatedCode);
-    Assert.Contains("enabled?: boolean;", generatedCode);
-}
+        var result = RunGenerator(source);
 
-#endregion
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
 
-#region TypeScript Definition Tests - Edge Cases
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
 
-[Fact]
-public void GeneratesTypeScriptDefinitionWithEscapedStrings()
-{
-    var source = @"
+        Assert.Contains("interface ComplexConfig {", generatedCode);
+        Assert.Contains("name: string;", generatedCode);
+        Assert.Contains("port: number;", generatedCode);
+        Assert.Contains("onStart: (arg0: string) => void;", generatedCode);
+        Assert.Contains("validator: (arg0: number) => Promise<boolean>;", generatedCode);
+        Assert.Contains("log: (message: string, level: number) => void;", generatedCode);
+        Assert.Contains("allowedPorts: number[];", generatedCode);
+        Assert.Contains("host?: string | null;", generatedCode);
+        Assert.Contains("enabled?: boolean;", generatedCode);
+    }
+
+    #endregion
+
+    #region TypeScript Definition Tests - Edge Cases
+
+    [Fact]
+    public void GeneratesTypeScriptDefinitionWithEscapedStrings()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -3343,20 +3357,20 @@ public partial class MyModule
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // Should properly escape module name in declare module statement
-    Assert.Contains("declare module 'my-module' {", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTypeScriptDefinitionForEmptyClass()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        // Should properly escape module name in declare module statement
+        Assert.Contains("declare module 'my-module' {", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTypeScriptDefinitionForEmptyClass()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -3367,21 +3381,21 @@ public partial class EmptyClass
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // Should still generate TypeDefinition with empty class
-    Assert.Contains("declare class EmptyClass {", generatedCode);
-    Assert.Contains("}", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTypeScriptDefinitionForEmptyModule()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        // Should still generate TypeDefinition with empty class
+        Assert.Contains("declare class EmptyClass {", generatedCode);
+        Assert.Contains("}", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTypeScriptDefinitionForEmptyModule()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -3392,24 +3406,24 @@ public partial class EmptyModule
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // Should still generate TypeDefinition with empty module
-    Assert.Contains("declare module 'emptyModule' {", generatedCode);
-}
+        var result = RunGenerator(source);
 
-#endregion
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
 
-#region XML Documentation / TSDoc Tests
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
 
-[Fact]
-public void GeneratesTsDocForClassWithSummary()
-{
-    var source = @"
+        // Should still generate TypeDefinition with empty module
+        Assert.Contains("declare module 'emptyModule' {", generatedCode);
+    }
+
+    #endregion
+
+    #region XML Documentation / TSDoc Tests
+
+    [Fact]
+    public void GeneratesTsDocForClassWithSummary()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -3425,23 +3439,23 @@ public partial class Vector2
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // Should contain TSDoc comment
-    Assert.Contains("/**", generatedCode);
-    Assert.Contains("* Represents a mathematical vector in 2D space.", generatedCode);
-    Assert.Contains("*/", generatedCode);
-    Assert.Contains("declare class Vector2", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTsDocForMethodWithParamAndReturns()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        // Should contain TSDoc comment
+        Assert.Contains("/**", generatedCode);
+        Assert.Contains("* Represents a mathematical vector in 2D space.", generatedCode);
+        Assert.Contains("*/", generatedCode);
+        Assert.Contains("declare class Vector2", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTsDocForMethodWithParamAndReturns()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -3460,26 +3474,26 @@ public partial class Calculator
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // Should contain method documentation
-    Assert.Contains("/**", generatedCode);
-    Assert.Contains("* Adds two numbers together.", generatedCode);
-    Assert.Contains("* @param a The first number", generatedCode);
-    Assert.Contains("* @param b The second number", generatedCode);
-    Assert.Contains("* @returns The sum of a and b", generatedCode);
-    Assert.Contains("*/", generatedCode);
-    Assert.Contains("add(a: number, b: number): number;", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTsDocForPropertyWithSummary()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        // Should contain method documentation
+        Assert.Contains("/**", generatedCode);
+        Assert.Contains("* Adds two numbers together.", generatedCode);
+        Assert.Contains("* @param a The first number", generatedCode);
+        Assert.Contains("* @param b The second number", generatedCode);
+        Assert.Contains("* @returns The sum of a and b", generatedCode);
+        Assert.Contains("*/", generatedCode);
+        Assert.Contains("add(a: number, b: number): number;", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTsDocForPropertyWithSummary()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -3501,23 +3515,23 @@ public partial class Person
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // Should contain property documentation
-    Assert.Contains("* Gets or sets the person's full name.", generatedCode);
-    Assert.Contains("name: string;", generatedCode);
-    Assert.Contains("* Gets or sets the person's age in years.", generatedCode);
-    Assert.Contains("age: number;", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTsDocForConstructorWithParameters()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        // Should contain property documentation
+        Assert.Contains("* Gets or sets the person's full name.", generatedCode);
+        Assert.Contains("name: string;", generatedCode);
+        Assert.Contains("* Gets or sets the person's age in years.", generatedCode);
+        Assert.Contains("age: number;", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTsDocForConstructorWithParameters()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -3537,23 +3551,23 @@ public partial class Rectangle
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // Should contain constructor documentation
-    Assert.Contains("* Creates a new rectangle with the specified dimensions.", generatedCode);
-    Assert.Contains("* @param width The width of the rectangle", generatedCode);
-    Assert.Contains("* @param height The height of the rectangle", generatedCode);
-    Assert.Contains("constructor(width: number, height: number);", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTsDocForModuleWithSummary()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        // Should contain constructor documentation
+        Assert.Contains("* Creates a new rectangle with the specified dimensions.", generatedCode);
+        Assert.Contains("* @param width The width of the rectangle", generatedCode);
+        Assert.Contains("* @param height The height of the rectangle", generatedCode);
+        Assert.Contains("constructor(width: number, height: number);", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTsDocForModuleWithSummary()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -3580,31 +3594,31 @@ public partial class MathModule
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // Should contain module documentation
-    Assert.Contains("* Provides utility functions for mathematical operations.", generatedCode);
-    Assert.Contains("declare module 'math'", generatedCode);
-    
-    // Should contain value documentation
-    Assert.Contains("* The value of PI (approximately 3.14159).", generatedCode);
-    Assert.Contains("export const pi: number;", generatedCode);
-    
-    // Should contain method documentation
-    Assert.Contains("* Calculates the square of a number.", generatedCode);
-    Assert.Contains("* @param x The number to square", generatedCode);
-    Assert.Contains("* @returns The square of x", generatedCode);
-    Assert.Contains("export function square(x: number): number;", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTsDocForRecordWithParameterDocs()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        // Should contain module documentation
+        Assert.Contains("* Provides utility functions for mathematical operations.", generatedCode);
+        Assert.Contains("declare module 'math'", generatedCode);
+
+        // Should contain value documentation
+        Assert.Contains("* The value of PI (approximately 3.14159).", generatedCode);
+        Assert.Contains("export const pi: number;", generatedCode);
+
+        // Should contain method documentation
+        Assert.Contains("* Calculates the square of a number.", generatedCode);
+        Assert.Contains("* @param x The number to square", generatedCode);
+        Assert.Contains("* @returns The square of x", generatedCode);
+        Assert.Contains("export function square(x: number): number;", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTsDocForRecordWithParameterDocs()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -3619,29 +3633,29 @@ namespace TestNamespace;
 public partial record UserProfile(string Name, string Email, int Age);
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // Should contain record documentation
-    Assert.Contains("* Represents a user's profile information.", generatedCode);
-    Assert.Contains("interface UserProfile", generatedCode);
-    
-    // Should contain parameter documentation
-    Assert.Contains("* The user's full name", generatedCode);
-    Assert.Contains("name: string;", generatedCode);
-    Assert.Contains("* The user's email address", generatedCode);
-    Assert.Contains("email: string;", generatedCode);
-    Assert.Contains("* The user's age in years", generatedCode);
-    Assert.Contains("age: number;", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTsDocForRecordWithDelegateParameters()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        // Should contain record documentation
+        Assert.Contains("* Represents a user's profile information.", generatedCode);
+        Assert.Contains("interface UserProfile", generatedCode);
+
+        // Should contain parameter documentation
+        Assert.Contains("* The user's full name", generatedCode);
+        Assert.Contains("name: string;", generatedCode);
+        Assert.Contains("* The user's email address", generatedCode);
+        Assert.Contains("email: string;", generatedCode);
+        Assert.Contains("* The user's age in years", generatedCode);
+        Assert.Contains("age: number;", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTsDocForRecordWithDelegateParameters()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 using System;
 
@@ -3656,24 +3670,24 @@ namespace TestNamespace;
 public partial record EventConfig(string EventName, Action<string> OnEvent);
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // Should contain record and parameter documentation
-    Assert.Contains("* Configuration for event handling.", generatedCode);
-    Assert.Contains("* The name of the event to listen for", generatedCode);
-    Assert.Contains("eventName: string;", generatedCode);
-    Assert.Contains("* Callback function invoked when the event occurs", generatedCode);
-    Assert.Contains("onEvent: (arg0: string) => void;", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTsDocWithRemarksSection()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        // Should contain record and parameter documentation
+        Assert.Contains("* Configuration for event handling.", generatedCode);
+        Assert.Contains("* The name of the event to listen for", generatedCode);
+        Assert.Contains("eventName: string;", generatedCode);
+        Assert.Contains("* Callback function invoked when the event occurs", generatedCode);
+        Assert.Contains("onEvent: (arg0: string) => void;", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTsDocWithRemarksSection()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -3695,24 +3709,24 @@ public partial class DataProcessor
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // Should contain both summary and remarks
-    Assert.Contains("* Processes the input data and returns the result.", generatedCode);
-    Assert.Contains("* This method may take a long time for large datasets.", generatedCode);
-    Assert.Contains("* Consider using the async version for better performance.", generatedCode);
-    Assert.Contains("* @param data The data to process", generatedCode);
-    Assert.Contains("* @returns The processed result", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void HandlesMultilineDocumentation()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        // Should contain both summary and remarks
+        Assert.Contains("* Processes the input data and returns the result.", generatedCode);
+        Assert.Contains("* This method may take a long time for large datasets.", generatedCode);
+        Assert.Contains("* Consider using the async version for better performance.", generatedCode);
+        Assert.Contains("* @param data The data to process", generatedCode);
+        Assert.Contains("* @returns The processed result", generatedCode);
+    }
+
+    [Fact]
+    public void HandlesMultilineDocumentation()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -3740,32 +3754,32 @@ public partial class ComplexCalculator
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // Should preserve multiline documentation
-    Assert.Contains("* Performs a complex mathematical calculation.", generatedCode);
-    Assert.Contains("* This operation involves multiple steps:", generatedCode);
-    Assert.Contains("* 1. Validation", generatedCode);
-    Assert.Contains("* 2. Transformation", generatedCode);
-    Assert.Contains("* 3. Computation", generatedCode);
-    
-    Assert.Contains("* @param input", generatedCode);
-    Assert.Contains("The input value to process.", generatedCode);
-    Assert.Contains("Must be a positive number.", generatedCode);
-    
-    Assert.Contains("* @returns", generatedCode);
-    Assert.Contains("The calculated result.", generatedCode);
-    Assert.Contains("Returns null if validation fails.", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void WorksWhenDocumentationIsMissing()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        // Should preserve multiline documentation
+        Assert.Contains("* Performs a complex mathematical calculation.", generatedCode);
+        Assert.Contains("* This operation involves multiple steps:", generatedCode);
+        Assert.Contains("* 1. Validation", generatedCode);
+        Assert.Contains("* 2. Transformation", generatedCode);
+        Assert.Contains("* 3. Computation", generatedCode);
+
+        Assert.Contains("* @param input", generatedCode);
+        Assert.Contains("The input value to process.", generatedCode);
+        Assert.Contains("Must be a positive number.", generatedCode);
+
+        Assert.Contains("* @returns", generatedCode);
+        Assert.Contains("The calculated result.", generatedCode);
+        Assert.Contains("Returns null if validation fails.", generatedCode);
+    }
+
+    [Fact]
+    public void WorksWhenDocumentationIsMissing()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -3781,25 +3795,25 @@ public partial class UndocumentedClass
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // Should still generate valid TypeScript without documentation
-    Assert.Contains("declare class UndocumentedClass {", generatedCode);
-    Assert.Contains("name: string;", generatedCode);
-    Assert.Contains("calculate(x: number): number;", generatedCode);
-    
-    // Should not have empty TSDoc comments
-    Assert.DoesNotContain("/**\n  */", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTsDocForStaticMembers()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        // Should still generate valid TypeScript without documentation
+        Assert.Contains("declare class UndocumentedClass {", generatedCode);
+        Assert.Contains("name: string;", generatedCode);
+        Assert.Contains("calculate(x: number): number;", generatedCode);
+
+        // Should not have empty TSDoc comments
+        Assert.DoesNotContain("/**\n  */", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTsDocForStaticMembers()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -3822,25 +3836,25 @@ public partial class Config
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // Should document static members
-    Assert.Contains("* The current application version.", generatedCode);
-    Assert.Contains("static version: string;", generatedCode);
-    
-    Assert.Contains("* Gets the default configuration.", generatedCode);
-    Assert.Contains("* @returns A new Config instance with default values", generatedCode);
-    Assert.Contains("static getDefault(): Config;", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTsDocForAsyncMethods()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        // Should document static members
+        Assert.Contains("* The current application version.", generatedCode);
+        Assert.Contains("static version: string;", generatedCode);
+
+        Assert.Contains("* Gets the default configuration.", generatedCode);
+        Assert.Contains("* @returns A new Config instance with default values", generatedCode);
+        Assert.Contains("static getDefault(): Config;", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTsDocForAsyncMethods()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 using System.Threading.Tasks;
 
@@ -3863,23 +3877,23 @@ public partial class ApiClient
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // Should document async methods
-    Assert.Contains("* Fetches data from the remote server.", generatedCode);
-    Assert.Contains("* @param endpoint The API endpoint to call", generatedCode);
-    Assert.Contains("* @returns A task that resolves to the fetched data", generatedCode);
-    Assert.Contains("fetchData(endpoint: string): Promise<string>;", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTsDocForModuleExportedClasses()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        // Should document async methods
+        Assert.Contains("* Fetches data from the remote server.", generatedCode);
+        Assert.Contains("* @param endpoint The API endpoint to call", generatedCode);
+        Assert.Contains("* @returns A task that resolves to the fetched data", generatedCode);
+        Assert.Contains("fetchData(endpoint: string): Promise<string>;", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTsDocForModuleExportedClasses()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -3913,30 +3927,30 @@ public partial class CounterModule
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
-    
-    // Module should have documentation
-    Assert.Contains("* Provides counter utilities.", moduleCode);
-    
-    // Exported class should have documentation
-    Assert.Contains("* A simple counter class.", moduleCode);
-    Assert.Contains("export class Counter {", moduleCode);
-    
-    // Class members should have documentation
-    Assert.Contains("* Gets or sets the current count.", moduleCode);
-    Assert.Contains("count: number;", moduleCode);
-    Assert.Contains("* Increments the counter by one.", moduleCode);
-    Assert.Contains("increment(): void;", moduleCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTsDocWithComplexMarkup()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
+
+        // Module should have documentation
+        Assert.Contains("* Provides counter utilities.", moduleCode);
+
+        // Exported class should have documentation
+        Assert.Contains("* A simple counter class.", moduleCode);
+        Assert.Contains("export class Counter {", moduleCode);
+
+        // Class members should have documentation
+        Assert.Contains("* Gets or sets the current count.", moduleCode);
+        Assert.Contains("count: number;", moduleCode);
+        Assert.Contains("* Increments the counter by one.", moduleCode);
+        Assert.Contains("increment(): void;", moduleCode);
+    }
+
+    [Fact]
+    public void GeneratesTsDocWithComplexMarkup()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -3954,22 +3968,22 @@ public partial class Formatter
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // Should handle XML entities in documentation
-    Assert.Contains("/**", generatedCode);
-    Assert.Contains("*/", generatedCode);
-    Assert.Contains("format(text: string): string;", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTsDocForOptionalParametersWithDocs()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        // Should handle XML entities in documentation
+        Assert.Contains("/**", generatedCode);
+        Assert.Contains("*/", generatedCode);
+        Assert.Contains("format(text: string): string;", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTsDocForOptionalParametersWithDocs()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -3990,24 +4004,24 @@ public partial class Logger
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    Assert.Contains("* Logs a message with optional severity level.", generatedCode);
-    Assert.Contains("* @param message The message to log", generatedCode);
-    Assert.Contains("* @param level The severity level (default: 0)", generatedCode);
-    Assert.Contains("* @param category The log category (default: \"\"General\"\")", generatedCode);
-    Assert.Contains("log(message: string, level?: number, category?: string): void;", generatedCode);
-}
+        var result = RunGenerator(source);
+
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        Assert.Contains("* Logs a message with optional severity level.", generatedCode);
+        Assert.Contains("* @param message The message to log", generatedCode);
+        Assert.Contains("* @param level The severity level (default: 0)", generatedCode);
+        Assert.Contains("* @param category The log category (default: \"\"General\"\")", generatedCode);
+        Assert.Contains("log(message: string, level?: number, category?: string): void;", generatedCode);
+    }
 
 
-[Fact]
-public void GeneratesTSDocWithAdvancedMarkdownFormatting()
-{
-    var source = @"
+    [Fact]
+    public void GeneratesTSDocWithAdvancedMarkdownFormatting()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 using System;
 
@@ -4067,46 +4081,47 @@ public partial class ProcessingOptions
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees.First(t => t.FilePath.Contains("DataUtils")).GetText().ToString();
-    
-    var typeDefStart = generatedCode.IndexOf("return @\"") + 9;
-    var typeDefEnd = generatedCode.IndexOf("\";", typeDefStart);
-    var typeDef = generatedCode.Substring(typeDefStart, typeDefEnd - typeDefStart);
-    
-    Assert.Contains("**advanced**", typeDef);
-    Assert.Contains("*custom*", typeDef);
-    Assert.Contains("`ProcessAsync`", typeDef);
-    Assert.Contains("`null`", typeDef);
-    Assert.Contains("`ProcessingOptions`", typeDef);
-    Assert.Contains("- **Validation**: Checks data integrity", typeDef);
-    Assert.Contains("- **Transformation**: Converts data format", typeDef);
-    Assert.Contains("- **Compression**: Reduces data size", typeDef);
-    Assert.Contains("[the documentation](https://example.com/docs)", typeDef);
-    Assert.Contains("```", typeDef);
-    Assert.Contains("var utils = new DataUtils();", typeDef);
-    Assert.Contains("**Example:**", typeDef);
-    Assert.Contains("`validator`", typeDef);
-    Assert.Contains("`true`", typeDef);
-    Assert.Contains("`false`", typeDef);
-    Assert.Contains("@param data", typeDef);
-    Assert.Contains("@param options", typeDef);
-    Assert.Contains("@returns", typeDef);
-    Assert.Contains("process(data: string, options: string): string | null;", typeDef);
-    Assert.Contains("validate(input: string, validator: (arg0: string) => boolean): boolean;", typeDef);
-    Assert.Contains("declare class DataUtils", typeDef);
-}
-#endregion
+        var result = RunGenerator(source);
 
-#region DateTime Tests
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
 
-[Fact]
-public void HandlesDateTimeProperties()
-{
-    var source = @"
+        var generatedCode = result.GeneratedTrees.First(t => t.FilePath.Contains("DataUtils")).GetText().ToString();
+
+        var typeDefStart = generatedCode.IndexOf("return @\"") + 9;
+        var typeDefEnd = generatedCode.IndexOf("\";", typeDefStart);
+        var typeDef = generatedCode.Substring(typeDefStart, typeDefEnd - typeDefStart);
+
+        Assert.Contains("**advanced**", typeDef);
+        Assert.Contains("*custom*", typeDef);
+        Assert.Contains("`ProcessAsync`", typeDef);
+        Assert.Contains("`null`", typeDef);
+        Assert.Contains("`ProcessingOptions`", typeDef);
+        Assert.Contains("- **Validation**: Checks data integrity", typeDef);
+        Assert.Contains("- **Transformation**: Converts data format", typeDef);
+        Assert.Contains("- **Compression**: Reduces data size", typeDef);
+        Assert.Contains("[the documentation](https://example.com/docs)", typeDef);
+        Assert.Contains("```", typeDef);
+        Assert.Contains("var utils = new DataUtils();", typeDef);
+        Assert.Contains("**Example:**", typeDef);
+        Assert.Contains("`validator`", typeDef);
+        Assert.Contains("`true`", typeDef);
+        Assert.Contains("`false`", typeDef);
+        Assert.Contains("@param data", typeDef);
+        Assert.Contains("@param options", typeDef);
+        Assert.Contains("@returns", typeDef);
+        Assert.Contains("process(data: string, options: string): string | null;", typeDef);
+        Assert.Contains("validate(input: string, validator: (arg0: string) => boolean): boolean;", typeDef);
+        Assert.Contains("declare class DataUtils", typeDef);
+    }
+
+    #endregion
+
+    #region DateTime Tests
+
+    [Fact]
+    public void HandlesDateTimeProperties()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 using System;
 
@@ -4126,26 +4141,26 @@ public partial class Event
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // Should marshal DateTime using NewDate
-    Assert.Contains("ctx.NewDate(", generatedCode);
-    
-    // Should unmarshal DateTime using AsDateTime
-    Assert.Contains("AsDateTime()", generatedCode);
-    
-    // Should check IsDate for validation
-    Assert.Contains("IsDate()", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void HandlesDateTimeMethodParameters()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        // Should marshal DateTime using NewDate
+        Assert.Contains("ctx.NewDate(", generatedCode);
+
+        // Should unmarshal DateTime using AsDateTime
+        Assert.Contains("AsDateTime()", generatedCode);
+
+        // Should check IsDate for validation
+        Assert.Contains("IsDate()", generatedCode);
+    }
+
+    [Fact]
+    public void HandlesDateTimeMethodParameters()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 using System;
 
@@ -4162,22 +4177,22 @@ public partial class Calendar
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // Should validate date parameter is a Date
-    Assert.Contains("IsDate()", generatedCode);
-    Assert.Contains("AsDateTime()", generatedCode);
-    Assert.Contains("\"Parameter 'date' must be a Date\"", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void HandlesDateTimeReturnTypes()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        // Should validate date parameter is a Date
+        Assert.Contains("IsDate()", generatedCode);
+        Assert.Contains("AsDateTime()", generatedCode);
+        Assert.Contains("\"Parameter 'date' must be a Date\"", generatedCode);
+    }
+
+    [Fact]
+    public void HandlesDateTimeReturnTypes()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 using System;
 
@@ -4197,23 +4212,23 @@ public partial class TimeService
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // Should marshal return values with NewDate
-    Assert.Contains("ctx.NewDate(", generatedCode);
-    
-    // Should handle nullable DateTime
-    Assert.Contains("ctx.Null()", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void HandlesDateTimeArrays()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        // Should marshal return values with NewDate
+        Assert.Contains("ctx.NewDate(", generatedCode);
+
+        // Should handle nullable DateTime
+        Assert.Contains("ctx.Null()", generatedCode);
+    }
+
+    [Fact]
+    public void HandlesDateTimeArrays()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 using System;
 
@@ -4233,23 +4248,23 @@ public partial class EventLog
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // Should use ToJSArray for marshaling arrays
-    Assert.Contains("ToJSArray", generatedCode);
-    
-    // Should use ToArray for unmarshaling arrays
-    Assert.Contains("ToArrayOf<global::System.DateTime>();", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void HandlesDateTimeInRecords()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        // Should use ToJSArray for marshaling arrays
+        Assert.Contains("ToJSArray", generatedCode);
+
+        // Should use ToArray for unmarshaling arrays
+        Assert.Contains("ToArrayOf<global::System.DateTime>();", generatedCode);
+    }
+
+    [Fact]
+    public void HandlesDateTimeInRecords()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 using System;
 
@@ -4263,24 +4278,24 @@ public partial record Appointment(
 );
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // ToJSValue should marshal DateTime
-    Assert.Contains("realm.NewDate(StartTime)", generatedCode);
-    
-    // FromJSValue should unmarshal DateTime
-    Assert.Contains("IsDate()", generatedCode);
-    Assert.Contains("AsDateTime()", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void HandlesDateTimeInModules()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        // ToJSValue should marshal DateTime
+        Assert.Contains("realm.NewDate(StartTime)", generatedCode);
+
+        // FromJSValue should unmarshal DateTime
+        Assert.Contains("IsDate()", generatedCode);
+        Assert.Contains("AsDateTime()", generatedCode);
+    }
+
+    [Fact]
+    public void HandlesDateTimeInModules()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 using System;
 
@@ -4300,20 +4315,20 @@ public partial class TimeModule
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    Assert.Contains("ctx.NewDate(", generatedCode);
-    Assert.Contains("AsDateTime()", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTypeScriptDateForDateTime()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        Assert.Contains("ctx.NewDate(", generatedCode);
+        Assert.Contains("AsDateTime()", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTypeScriptDateForDateTime()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 using System;
 
@@ -4333,22 +4348,22 @@ public partial class DateHandler
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // Should map DateTime to Date in TypeScript
-    Assert.Contains("date: Date;", generatedCode);
-    Assert.Contains("optionalDate: Date | null;", generatedCode);
-    Assert.Contains("getDate(input: Date): Date;", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTypeScriptDateArrayForDateTimeArray()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        // Should map DateTime to Date in TypeScript
+        Assert.Contains("date: Date;", generatedCode);
+        Assert.Contains("optionalDate: Date | null;", generatedCode);
+        Assert.Contains("getDate(input: Date): Date;", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTypeScriptDateArrayForDateTimeArray()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 using System;
 
@@ -4365,21 +4380,21 @@ public partial class Timeline
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // Should map DateTime[] to Date[] in TypeScript
-    Assert.Contains("events: Date[];", generatedCode);
-    Assert.Contains("getDates(): Date[];", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTypeScriptDateForRecordDateTime()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        // Should map DateTime[] to Date[] in TypeScript
+        Assert.Contains("events: Date[];", generatedCode);
+        Assert.Contains("getDates(): Date[];", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTypeScriptDateForRecordDateTime()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 using System;
 
@@ -4393,23 +4408,23 @@ public partial record Event(
 );
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // Should map DateTime to Date in TypeScript interface
-    Assert.Contains("interface Event {", generatedCode);
-    Assert.Contains("name: string;", generatedCode);
-    Assert.Contains("startDate: Date;", generatedCode);
-    Assert.Contains("endDate?: Date | null;", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTypeScriptDateForModuleDateTime()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        // Should map DateTime to Date in TypeScript interface
+        Assert.Contains("interface Event {", generatedCode);
+        Assert.Contains("name: string;", generatedCode);
+        Assert.Contains("startDate: Date;", generatedCode);
+        Assert.Contains("endDate?: Date | null;", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTypeScriptDateForModuleDateTime()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 using System;
 
@@ -4426,21 +4441,21 @@ public partial class TimeModule
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // Should map DateTime to Date in module exports
-    Assert.Contains("export const startTime: Date;", generatedCode);
-    Assert.Contains("export function addDays(date: Date, days: number): Date;", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesTsDocForDateTimeParameters()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        // Should map DateTime to Date in module exports
+        Assert.Contains("export const startTime: Date;", generatedCode);
+        Assert.Contains("export function addDays(date: Date, days: number): Date;", generatedCode);
+    }
+
+    [Fact]
+    public void GeneratesTsDocForDateTimeParameters()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 using System;
 
@@ -4460,24 +4475,24 @@ public partial class Scheduler
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // Should have proper TSDoc with Date types
-    Assert.Contains("* Checks if a date is available for booking.", generatedCode);
-    Assert.Contains("* @param date The date to check", generatedCode);
-    Assert.Contains("* @param endDate Optional end date for range checking", generatedCode);
-    Assert.Contains("* @returns True if available, false otherwise", generatedCode);
-    Assert.Contains("isAvailable(date: Date, endDate?: Date | null): boolean;", generatedCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void HandlesMixedDateTimeAndOtherTypes()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+        // Should have proper TSDoc with Date types
+        Assert.Contains("* Checks if a date is available for booking.", generatedCode);
+        Assert.Contains("* @param date The date to check", generatedCode);
+        Assert.Contains("* @param endDate Optional end date for range checking", generatedCode);
+        Assert.Contains("* @returns True if available, false otherwise", generatedCode);
+        Assert.Contains("isAvailable(date: Date, endDate?: Date | null): boolean;", generatedCode);
+    }
+
+    [Fact]
+    public void HandlesMixedDateTimeAndOtherTypes()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 using System;
 
@@ -4500,32 +4515,32 @@ public partial class Booking
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
-    
-    // Should handle mixed types correctly
-    Assert.Contains("id: string;", generatedCode);
-    Assert.Contains("bookingDate: Date;", generatedCode);
-    Assert.Contains("durationMinutes: number;", generatedCode);
-    Assert.Contains("reserve(customerId: string, date: Date, duration: number): boolean;", generatedCode);
-    
-    // Should have proper marshaling
-    Assert.Contains("ctx.NewString(", generatedCode);
-    Assert.Contains("ctx.NewDate(", generatedCode);
-    Assert.Contains("ctx.NewNumber(", generatedCode);
-}
+        var result = RunGenerator(source);
 
-#endregion
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
 
-#region JSModuleInterface Tests
+        var generatedCode = result.GeneratedTrees[0].GetText().ToString();
 
-[Fact]
-public void GeneratesModuleWithInterface()
-{
-    var source = @"
+        // Should handle mixed types correctly
+        Assert.Contains("id: string;", generatedCode);
+        Assert.Contains("bookingDate: Date;", generatedCode);
+        Assert.Contains("durationMinutes: number;", generatedCode);
+        Assert.Contains("reserve(customerId: string, date: Date, duration: number): boolean;", generatedCode);
+
+        // Should have proper marshaling
+        Assert.Contains("ctx.NewString(", generatedCode);
+        Assert.Contains("ctx.NewDate(", generatedCode);
+        Assert.Contains("ctx.NewNumber(", generatedCode);
+    }
+
+    #endregion
+
+    #region JSModuleInterface Tests
+
+    [Fact]
+    public void GeneratesModuleWithInterface()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -4542,24 +4557,24 @@ public partial class MyModule
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
-    
-    // Should include interface in module declaration
-    Assert.Contains("declare module 'myModule' {", moduleCode);
-    Assert.Contains("export interface Config {", moduleCode);
-    Assert.Contains("name: string;", moduleCode);
-    Assert.Contains("port: number;", moduleCode);
-    Assert.Contains("export const version: string;", moduleCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesModuleWithMultipleInterfaces()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
+
+        // Should include interface in module declaration
+        Assert.Contains("declare module 'myModule' {", moduleCode);
+        Assert.Contains("export interface Config {", moduleCode);
+        Assert.Contains("name: string;", moduleCode);
+        Assert.Contains("port: number;", moduleCode);
+        Assert.Contains("export const version: string;", moduleCode);
+    }
+
+    [Fact]
+    public void GeneratesModuleWithMultipleInterfaces()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -4578,26 +4593,26 @@ public partial class AppModule
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
-    
-    // Should include both interfaces
-    Assert.Contains("export interface UserProfile {", moduleCode);
-    Assert.Contains("name: string;", moduleCode);
-    Assert.Contains("email: string;", moduleCode);
-    
-    Assert.Contains("export interface Settings {", moduleCode);
-    Assert.Contains("darkMode: boolean;", moduleCode);
-    Assert.Contains("language: string;", moduleCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesModuleWithBothClassAndInterface()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
+
+        // Should include both interfaces
+        Assert.Contains("export interface UserProfile {", moduleCode);
+        Assert.Contains("name: string;", moduleCode);
+        Assert.Contains("email: string;", moduleCode);
+
+        Assert.Contains("export interface Settings {", moduleCode);
+        Assert.Contains("darkMode: boolean;", moduleCode);
+        Assert.Contains("language: string;", moduleCode);
+    }
+
+    [Fact]
+    public void GeneratesModuleWithBothClassAndInterface()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -4622,28 +4637,28 @@ public partial class MyModule
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
-    
-    // Should include both class and interface
-    Assert.Contains("export class MyClass {", moduleCode);
-    Assert.Contains("constructor();", moduleCode);
-    Assert.Contains("name: string;", moduleCode);
-    
-    Assert.Contains("export interface MyInterface {", moduleCode);
-    Assert.Contains("id: number;", moduleCode);
-    Assert.Contains("value: string;", moduleCode);
-    
-    Assert.Contains("export function add(a: number, b: number): number;", moduleCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void AddsInterfaceToModuleExports()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
+
+        // Should include both class and interface
+        Assert.Contains("export class MyClass {", moduleCode);
+        Assert.Contains("constructor();", moduleCode);
+        Assert.Contains("name: string;", moduleCode);
+
+        Assert.Contains("export interface MyInterface {", moduleCode);
+        Assert.Contains("id: number;", moduleCode);
+        Assert.Contains("value: string;", moduleCode);
+
+        Assert.Contains("export function add(a: number, b: number): number;", moduleCode);
+    }
+
+    [Fact]
+    public void AddsInterfaceToModuleExports()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -4660,20 +4675,20 @@ public partial class MyModule
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
-    
-    // Should add interface name to exports list
-    Assert.Contains(".AddExports(\"version\", \"Config\")", moduleCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void UsesCustomExportNameForInterface()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
+
+        // Should add interface name to exports list
+        Assert.Contains(".AddExports(\"version\", \"Config\")", moduleCode);
+    }
+
+    [Fact]
+    public void UsesCustomExportNameForInterface()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -4688,21 +4703,21 @@ public partial class MyModule
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
-    
-    // Should use custom export name
-    Assert.Contains("export interface Profile {", moduleCode);
-    Assert.Contains(".AddExports(\"Profile\")", moduleCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void ReportsErrorForInvalidModuleInterface()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
+
+        // Should use custom export name
+        Assert.Contains("export interface Profile {", moduleCode);
+        Assert.Contains(".AddExports(\"Profile\")", moduleCode);
+    }
+
+    [Fact]
+    public void ReportsErrorForInvalidModuleInterface()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -4717,18 +4732,18 @@ public partial class MyModule
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    var error = result.Diagnostics.FirstOrDefault(d => d.Id == "HAKO020");
-    Assert.NotNull(error);
-    Assert.Equal(DiagnosticSeverity.Error, error.Severity);
-    Assert.Contains("does not have the [JSObject] attribute", error.GetMessage());
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void ReportsErrorForInterfaceInMultipleModules()
-{
-    var source = @"
+        var error = result.Diagnostics.FirstOrDefault(d => d.Id == "HAKO020");
+        Assert.NotNull(error);
+        Assert.Equal(DiagnosticSeverity.Error, error.Severity);
+        Assert.Contains("does not have the [JSObject] attribute", error.GetMessage());
+    }
+
+    [Fact]
+    public void ReportsErrorForInterfaceInMultipleModules()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -4749,18 +4764,18 @@ public partial class Module2
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    var error = result.Diagnostics.FirstOrDefault(d => d.Id == "HAKO021");
-    Assert.NotNull(error);
-    Assert.Equal(DiagnosticSeverity.Error, error.Severity);
-    Assert.Contains("referenced by multiple modules", error.GetMessage());
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void ReportsErrorForDuplicateInterfaceExportName()
-{
-    var source = @"
+        var error = result.Diagnostics.FirstOrDefault(d => d.Id == "HAKO021");
+        Assert.NotNull(error);
+        Assert.Equal(DiagnosticSeverity.Error, error.Severity);
+        Assert.Contains("referenced by multiple modules", error.GetMessage());
+    }
+
+    [Fact]
+    public void ReportsErrorForDuplicateInterfaceExportName()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -4779,18 +4794,18 @@ public partial class MyModule
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    var error = result.Diagnostics.FirstOrDefault(d => d.Id == "HAKO011");
-    Assert.NotNull(error);
-    Assert.Equal(DiagnosticSeverity.Error, error.Severity);
-    Assert.Contains("Export names must be unique", error.GetMessage());
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void ReportsErrorForInterfaceNameConflictWithMethod()
-{
-    var source = @"
+        var error = result.Diagnostics.FirstOrDefault(d => d.Id == "HAKO011");
+        Assert.NotNull(error);
+        Assert.Equal(DiagnosticSeverity.Error, error.Severity);
+        Assert.Contains("Export names must be unique", error.GetMessage());
+    }
+
+    [Fact]
+    public void ReportsErrorForInterfaceNameConflictWithMethod()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -4807,17 +4822,17 @@ public partial class MyModule
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    var error = result.Diagnostics.FirstOrDefault(d => d.Id == "HAKO011");
-    Assert.NotNull(error);
-    Assert.Contains("Export names must be unique", error.GetMessage());
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesModuleInterfaceWithOptionalParameters()
-{
-    var source = @"
+        var error = result.Diagnostics.FirstOrDefault(d => d.Id == "HAKO011");
+        Assert.NotNull(error);
+        Assert.Contains("Export names must be unique", error.GetMessage());
+    }
+
+    [Fact]
+    public void GeneratesModuleInterfaceWithOptionalParameters()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -4836,22 +4851,22 @@ public partial class MyModule
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
-    
-    Assert.Contains("export interface Config {", moduleCode);
-    Assert.Contains("name: string;", moduleCode);
-    Assert.Contains("port?: number;", moduleCode);
-    Assert.Contains("host?: string | null;", moduleCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesModuleInterfaceWithDelegates()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
+
+        Assert.Contains("export interface Config {", moduleCode);
+        Assert.Contains("name: string;", moduleCode);
+        Assert.Contains("port?: number;", moduleCode);
+        Assert.Contains("host?: string | null;", moduleCode);
+    }
+
+    [Fact]
+    public void GeneratesModuleInterfaceWithDelegates()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 using System;
 
@@ -4871,22 +4886,22 @@ public partial class MyModule
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
-    
-    Assert.Contains("export interface EventConfig {", moduleCode);
-    Assert.Contains("eventName: string;", moduleCode);
-    Assert.Contains("onEvent: (arg0: string) => void;", moduleCode);
-    Assert.Contains("validator: (arg0: number) => boolean;", moduleCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesModuleInterfaceWithCustomPropertyNames()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
+
+        Assert.Contains("export interface EventConfig {", moduleCode);
+        Assert.Contains("eventName: string;", moduleCode);
+        Assert.Contains("onEvent: (arg0: string) => void;", moduleCode);
+        Assert.Contains("validator: (arg0: number) => boolean;", moduleCode);
+    }
+
+    [Fact]
+    public void GeneratesModuleInterfaceWithCustomPropertyNames()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -4904,21 +4919,21 @@ public partial class ApiModule
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
-    
-    Assert.Contains("export interface ApiRequest {", moduleCode);
-    Assert.Contains("api_key: string;", moduleCode);
-    Assert.Contains("user_id: number;", moduleCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesModuleInterfaceWithArrayTypes()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
+
+        Assert.Contains("export interface ApiRequest {", moduleCode);
+        Assert.Contains("api_key: string;", moduleCode);
+        Assert.Contains("user_id: number;", moduleCode);
+    }
+
+    [Fact]
+    public void GeneratesModuleInterfaceWithArrayTypes()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -4937,22 +4952,22 @@ public partial class DataModule
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
-    
-    Assert.Contains("export interface DataSet {", moduleCode);
-    Assert.Contains("numbers: number[];", moduleCode);
-    Assert.Contains("tags: string[];", moduleCode);
-    Assert.Contains("buffer: ArrayBuffer;", moduleCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesModuleInterfaceWithDocumentation()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
+
+        Assert.Contains("export interface DataSet {", moduleCode);
+        Assert.Contains("numbers: number[];", moduleCode);
+        Assert.Contains("tags: string[];", moduleCode);
+        Assert.Contains("buffer: ArrayBuffer;", moduleCode);
+    }
+
+    [Fact]
+    public void GeneratesModuleInterfaceWithDocumentation()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -4975,25 +4990,25 @@ public partial class ConfigModule
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
-    
-    // Should include interface documentation
-    Assert.Contains("* Configuration settings for the application.", moduleCode);
-    Assert.Contains("export interface AppConfig {", moduleCode);
-    Assert.Contains("* The application name", moduleCode);
-    Assert.Contains("name: string;", moduleCode);
-    Assert.Contains("* The server port", moduleCode);
-    Assert.Contains("port: number;", moduleCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesModuleWithInterfaceOrderedBeforeValues()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
+
+        // Should include interface documentation
+        Assert.Contains("* Configuration settings for the application.", moduleCode);
+        Assert.Contains("export interface AppConfig {", moduleCode);
+        Assert.Contains("* The application name", moduleCode);
+        Assert.Contains("name: string;", moduleCode);
+        Assert.Contains("* The server port", moduleCode);
+        Assert.Contains("port: number;", moduleCode);
+    }
+
+    [Fact]
+    public void GeneratesModuleWithInterfaceOrderedBeforeValues()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -5021,27 +5036,27 @@ public partial class MyModule
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
-    
-    // Check the order: classes, then interfaces, then values, then methods
-    var classPos = moduleCode.IndexOf("export class MyClass");
-    var interfacePos = moduleCode.IndexOf("export interface MyInterface");
-    var valuePos = moduleCode.IndexOf("export const version");
-    var methodPos = moduleCode.IndexOf("export function doSomething");
-    
-    Assert.True(classPos < interfacePos, "Class should come before interface");
-    Assert.True(interfacePos < valuePos, "Interface should come before values");
-    Assert.True(valuePos < methodPos, "Values should come before methods");
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void InterfaceDoesNotRequireRuntimeRegistration()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
+
+        // Check the order: classes, then interfaces, then values, then methods
+        var classPos = moduleCode.IndexOf("export class MyClass");
+        var interfacePos = moduleCode.IndexOf("export interface MyInterface");
+        var valuePos = moduleCode.IndexOf("export const version");
+        var methodPos = moduleCode.IndexOf("export function doSomething");
+
+        Assert.True(classPos < interfacePos, "Class should come before interface");
+        Assert.True(interfacePos < valuePos, "Interface should come before values");
+        Assert.True(valuePos < methodPos, "Values should come before methods");
+    }
+
+    [Fact]
+    public void InterfaceDoesNotRequireRuntimeRegistration()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
@@ -5056,24 +5071,24 @@ public partial class MyModule
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
-    
-    // Should not have any CreatePrototype or CompleteClassExport calls for interfaces
-    Assert.DoesNotContain("realm.CreatePrototype<TestNamespace.Config>", moduleCode);
-    Assert.DoesNotContain("CompleteClassExport", moduleCode);
-    
-    // But should still be in exports list
-    Assert.Contains(".AddExports(\"Config\")", moduleCode);
-}
+        var result = RunGenerator(source);
 
-[Fact]
-public void GeneratesComplexModuleWithMixedExports()
-{
-    var source = @"
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
+
+        // Should not have any CreatePrototype or CompleteClassExport calls for interfaces
+        Assert.DoesNotContain("realm.CreatePrototype<TestNamespace.Config>", moduleCode);
+        Assert.DoesNotContain("CompleteClassExport", moduleCode);
+
+        // But should still be in exports list
+        Assert.Contains(".AddExports(\"Config\")", moduleCode);
+    }
+
+    [Fact]
+    public void GeneratesComplexModuleWithMixedExports()
+    {
+        var source = @"
 using HakoJS.SourceGeneration;
 using System.Threading.Tasks;
 
@@ -5138,45 +5153,46 @@ public partial class LoggingModule
 }
 ";
 
-    var result = RunGenerator(source);
-    
-    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-    
-    var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
-    
-    // Should have module declaration with all exports
-    Assert.Contains("declare module 'logging' {", moduleCode);
-    
-    // Class export
-    Assert.Contains("export class Logger {", moduleCode);
-    Assert.Contains("name: string;", moduleCode);
-    Assert.Contains("log(message: string): void;", moduleCode);
-    
-    // Interface exports
-    Assert.Contains("export interface LogConfig {", moduleCode);
-    Assert.Contains("level: string;", moduleCode);
-    Assert.Contains("timestamps?: boolean;", moduleCode);
-    
-    Assert.Contains("export interface LogEntry {", moduleCode);
-    Assert.Contains("message: string;", moduleCode);
-    Assert.Contains("level: string;", moduleCode);
-    Assert.Contains("timestamp: Date;", moduleCode);
-    
-    // Value export
-    Assert.Contains("* Default log level.", moduleCode);
-    Assert.Contains("export const defaultLevel: string;", moduleCode);
-    
-    // Method exports
-    Assert.Contains("* Configures the logging system.", moduleCode);
-    Assert.Contains("export function configure(config: LogConfig): void;", moduleCode);
-    
-    Assert.Contains("* Gets recent log entries.", moduleCode);
-    Assert.Contains("export function getRecent(count: number): Promise<LogEntry[]>;", moduleCode);
-    
-    // All exports in AddExports
-    Assert.Contains(".AddExports(\"defaultLevel\", \"configure\", \"getRecent\", \"Logger\", \"LogConfig\", \"LogEntry\")", moduleCode);
-}
+        var result = RunGenerator(source);
 
-#endregion
+        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
 
+        var moduleCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
+
+        // Should have module declaration with all exports
+        Assert.Contains("declare module 'logging' {", moduleCode);
+
+        // Class export
+        Assert.Contains("export class Logger {", moduleCode);
+        Assert.Contains("name: string;", moduleCode);
+        Assert.Contains("log(message: string): void;", moduleCode);
+
+        // Interface exports
+        Assert.Contains("export interface LogConfig {", moduleCode);
+        Assert.Contains("level: string;", moduleCode);
+        Assert.Contains("timestamps?: boolean;", moduleCode);
+
+        Assert.Contains("export interface LogEntry {", moduleCode);
+        Assert.Contains("message: string;", moduleCode);
+        Assert.Contains("level: string;", moduleCode);
+        Assert.Contains("timestamp: Date;", moduleCode);
+
+        // Value export
+        Assert.Contains("* Default log level.", moduleCode);
+        Assert.Contains("export const defaultLevel: string;", moduleCode);
+
+        // Method exports
+        Assert.Contains("* Configures the logging system.", moduleCode);
+        Assert.Contains("export function configure(config: LogConfig): void;", moduleCode);
+
+        Assert.Contains("* Gets recent log entries.", moduleCode);
+        Assert.Contains("export function getRecent(count: number): Promise<LogEntry[]>;", moduleCode);
+
+        // All exports in AddExports
+        Assert.Contains(
+            ".AddExports(\"defaultLevel\", \"configure\", \"getRecent\", \"Logger\", \"LogConfig\", \"LogEntry\")",
+            moduleCode);
+    }
+
+    #endregion
 }
