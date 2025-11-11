@@ -6,6 +6,7 @@
         <Nullable>enable</Nullable>
         <RootNamespace>HakoJS.Backend.Wasmtime</RootNamespace>
         <IsAotCompatible>true</IsAotCompatible>
+        <EmbedUntrackedSources>false</EmbedUntrackedSources>
     </PropertyGroup>
 
     <PropertyGroup>

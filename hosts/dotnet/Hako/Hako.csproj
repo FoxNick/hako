@@ -8,6 +8,7 @@
         <LangVersion>preview</LangVersion>
         <IsAotCompatible>true</IsAotCompatible>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <EmbedUntrackedSources>false</EmbedUntrackedSources>
     </PropertyGroup>
 
     <PropertyGroup>
