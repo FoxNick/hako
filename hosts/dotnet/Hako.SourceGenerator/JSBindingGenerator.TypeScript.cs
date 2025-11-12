@@ -105,14 +105,7 @@ public partial class JSBindingGenerator
             if (!string.IsNullOrWhiteSpace(ctorDoc))
                 sb.Append(ctorDoc);
 
-            var ctorParams = string.Join(", ", constructor.Parameters.Select(p =>
-            {
-                var tsType = p is { IsDelegate: true, DelegateInfo: not null }
-                    ? GenerateTypeScriptForDelegate(p.DelegateInfo)
-                    : MapTypeToTypeScript(p.TypeInfo, p.IsOptional);
-                var optional = p.IsOptional ? "?" : "";
-                return $"{p.Name}{optional}: {tsType}";
-            }));
+            var ctorParams = string.Join(", ", constructor.Parameters.Select(p => RenderParameter(p)));
             sb.AppendLine($"  constructor({ctorParams});");
 
             if (properties.Any() || methods.Any())
@@ -125,10 +118,8 @@ public partial class JSBindingGenerator
             if (!string.IsNullOrWhiteSpace(propDoc))
                 sb.Append(propDoc);
 
-            var staticModifier = prop.IsStatic ? "static " : "";
-            var readonlyModifier = !prop.HasSetter ? "readonly " : "";
-            var tsType = MapTypeToTypeScript(prop.TypeInfo);
-            sb.AppendLine($"  {staticModifier}{readonlyModifier}{prop.JsName}: {tsType};");
+            var tsType = MapTypeToTypeScript(prop.TypeInfo, readOnly: !prop.HasSetter);
+            sb.AppendLine(RenderPropertyLine(prop.JsName, tsType, prop.IsStatic, !prop.HasSetter));
         }
 
         if (properties.Any() && methods.Any())
@@ -140,21 +131,8 @@ public partial class JSBindingGenerator
             if (!string.IsNullOrWhiteSpace(methodDoc))
                 sb.Append(methodDoc);
 
-            var staticModifier = method.IsStatic ? "static " : "";
-            var methodParams = string.Join(", ", method.Parameters.Select(p =>
-            {
-                var tsType = p is { IsDelegate: true, DelegateInfo: not null }
-                    ? GenerateTypeScriptForDelegate(p.DelegateInfo)
-                    : MapTypeToTypeScript(p.TypeInfo, p.IsOptional);
-                var optional = p.IsOptional ? "?" : "";
-                return $"{p.Name}{optional}: {tsType}";
-            }));
-
             var returnType = method.IsVoid ? "void" : MapTypeToTypeScript(method.ReturnType);
-            if (method.IsAsync)
-                returnType = $"Promise<{returnType}>";
-
-            sb.AppendLine($"  {staticModifier}{method.JsName}({methodParams}): {returnType};");
+            sb.AppendLine(RenderMethodSignature(method.JsName, method.Parameters, returnType, method.IsStatic, method.IsAsync));
         }
 
         sb.AppendLine("}");
@@ -183,7 +161,7 @@ public partial class JSBindingGenerator
 
         return sb.ToString();
     }
-    
+
     private static string EscapeTsString(string s)
     {
         return s.Replace("\\", "\\\\").Replace("\"", "\\\"");
@@ -391,20 +369,8 @@ public partial class JSBindingGenerator
             if (!string.IsNullOrWhiteSpace(methodDoc))
                 sb.Append(methodDoc);
 
-            var methodParams = string.Join(", ", method.Parameters.Select(p =>
-            {
-                var tsType = p is { IsDelegate: true, DelegateInfo: not null }
-                    ? GenerateTypeScriptForDelegate(p.DelegateInfo)
-                    : MapTypeToTypeScript(p.TypeInfo, p.IsOptional);
-                var optional = p.IsOptional ? "?" : "";
-                return $"{p.Name}{optional}: {tsType}";
-            }));
-
             var returnType = method.IsVoid ? "void" : MapTypeToTypeScript(method.ReturnType);
-            if (method.IsAsync)
-                returnType = $"Promise<{returnType}>";
-
-            sb.AppendLine($"  export function {method.JsName}({methodParams}): {returnType};");
+            sb.AppendLine(RenderFunctionSignature(method.JsName, method.Parameters, returnType, method.IsAsync, indent: 2, isExport: true));
         }
 
         sb.AppendLine("}");
@@ -415,7 +381,8 @@ public partial class JSBindingGenerator
     private static string GenerateObjectTypeScriptDefinition(
         string typeName,
         List<RecordParameterModel> parameters,
-        string? typeDocumentation = null)
+        string? typeDocumentation = null,
+        bool readOnly = false)
     {
         var sb = new StringBuilder();
 
@@ -442,11 +409,10 @@ public partial class JSBindingGenerator
                 sb.Append(paramDoc);
 
             var tsType = param is { IsDelegate: true, DelegateInfo: not null }
-                ? GenerateTypeScriptForDelegate(param.DelegateInfo)
-                : MapTypeToTypeScript(param.TypeInfo, param.IsOptional);
+                ? GenerateTypeScriptForDelegate(param.DelegateInfo, readOnly)
+                : MapTypeToTypeScript(param.TypeInfo, param.IsOptional, readOnly);
 
-            var optional = param.IsOptional ? "?" : "";
-            sb.AppendLine($"  {param.JsName}{optional}: {tsType};");
+            sb.AppendLine(RenderPropertyLine(param.JsName, tsType, isReadonly: readOnly, isOptional: param.IsOptional));
         }
 
         sb.AppendLine("}");
@@ -457,7 +423,8 @@ public partial class JSBindingGenerator
     private static string GenerateMarshalableTypeScriptDefinition(
         string typeName,
         List<MarshalablePropertyModel> properties,
-        string? documentation = null)
+        string? documentation = null,
+        bool readOnly = false)
     {
         var sb = new StringBuilder();
 
@@ -480,8 +447,8 @@ public partial class JSBindingGenerator
             if (!string.IsNullOrWhiteSpace(propDoc))
                 sb.Append(propDoc);
 
-            var tsType = MapTypeToTypeScript(prop.TypeInfo);
-            sb.AppendLine($"  {prop.JsName}: {tsType};");
+            var tsType = MapTypeToTypeScript(prop.TypeInfo, readOnly: readOnly);
+            sb.AppendLine(RenderPropertyLine(prop.JsName, tsType, isReadonly: readOnly));
         }
 
         sb.AppendLine("}");
@@ -489,16 +456,16 @@ public partial class JSBindingGenerator
         return sb.ToString();
     }
 
-    private static string GenerateTypeScriptForDelegate(DelegateInfo delegateInfo)
+    private static string GenerateTypeScriptForDelegate(DelegateInfo delegateInfo, bool readOnly = false)
     {
         var parameters = string.Join(", ", delegateInfo.Parameters.Select(p =>
         {
-            var tsType = MapTypeToTypeScript(p.TypeInfo, p.IsOptional);
+            var tsType = MapTypeToTypeScript(p.TypeInfo, p.IsOptional, readOnly);
             var optional = p.IsOptional ? "?" : "";
             return $"{p.Name}{optional}: {tsType}";
         }));
 
-        var returnType = delegateInfo.IsVoid ? "void" : MapTypeToTypeScript(delegateInfo.ReturnType);
+        var returnType = delegateInfo.IsVoid ? "void" : MapTypeToTypeScript(delegateInfo.ReturnType, readOnly: readOnly);
 
         if (delegateInfo.IsAsync)
             returnType = $"Promise<{returnType}>";
@@ -508,9 +475,83 @@ public partial class JSBindingGenerator
 
     #endregion
 
+    #region TypeScript Rendering Helpers
+
+    /// <summary>
+    /// Renders a TypeScript property line with all modifiers
+    /// </summary>
+    private static string RenderPropertyLine(
+        string propertyName,
+        string tsType,
+        bool isStatic = false,
+        bool isReadonly = false,
+        bool isOptional = false,
+        int indent = 2)
+    {
+        var indentStr = new string(' ', indent);
+        var staticModifier = isStatic ? "static " : "";
+        var readonlyModifier = isReadonly ? "readonly " : "";
+        var optional = isOptional ? "?" : "";
+        return $"{indentStr}{staticModifier}{readonlyModifier}{propertyName}{optional}: {tsType};";
+    }
+
+    /// <summary>
+    /// Renders a TypeScript method signature with all modifiers
+    /// </summary>
+    private static string RenderMethodSignature(
+        string methodName,
+        List<ParameterModel> parameters,
+        string returnType,
+        bool isStatic = false,
+        bool isAsync = false,
+        int indent = 2)
+    {
+        var indentStr = new string(' ', indent);
+        var staticModifier = isStatic ? "static " : "";
+
+        var methodParams = string.Join(", ", parameters.Select(p => RenderParameter(p)));
+
+        var finalReturnType = isAsync ? $"Promise<{returnType}>" : returnType;
+        return $"{indentStr}{staticModifier}{methodName}({methodParams}): {finalReturnType};";
+    }
+
+    /// <summary>
+    /// Renders a TypeScript function signature (for module exports)
+    /// </summary>
+    private static string RenderFunctionSignature(
+        string functionName,
+        List<ParameterModel> parameters,
+        string returnType,
+        bool isAsync = false,
+        int indent = 2,
+        bool isExport = false)
+    {
+        var indentStr = new string(' ', indent);
+        var exportModifier = isExport ? "export " : "";
+
+        var methodParams = string.Join(", ", parameters.Select(p => RenderParameter(p)));
+
+        var finalReturnType = isAsync ? $"Promise<{returnType}>" : returnType;
+        return $"{indentStr}{exportModifier}function {functionName}({methodParams}): {finalReturnType};";
+    }
+
+    /// <summary>
+    /// Renders a single parameter with optional modifier
+    /// </summary>
+    private static string RenderParameter(ParameterModel param, bool readOnly = false)
+    {
+        var tsType = param is { IsDelegate: true, DelegateInfo: not null }
+            ? GenerateTypeScriptForDelegate(param.DelegateInfo, readOnly)
+            : MapTypeToTypeScript(param.TypeInfo, param.IsOptional, readOnly);
+        var optional = param.IsOptional ? "?" : "";
+        return $"{param.Name}{optional}: {tsType}";
+    }
+
+    #endregion
+
     #region TypeScript Type Mapping
 
-    private static string MapTypeToTypeScript(TypeInfo type, bool isOptional = false)
+    private static string MapTypeToTypeScript(TypeInfo type, bool isOptional = false, bool readOnly = false)
     {
         if (type.SpecialType == SpecialType.System_Void)
             return "void";
@@ -526,7 +567,7 @@ public partial class JSBindingGenerator
         {
             var enumName = ExtractSimpleTypeName(type.FullName);
 
-            if (type.UnderlyingType != null || (type.IsNullable && !type.IsValueType))
+            if (type.UnderlyingType != null || type is { IsNullable: true, IsValueType: false })
                 return $"{enumName} | null";
 
             return enumName;
@@ -534,11 +575,11 @@ public partial class JSBindingGenerator
 
         if (type.UnderlyingType != null)
         {
-            var underlyingTs = MapPrimitiveTypeToTypeScript(CreateTypeInfo(type.UnderlyingType));
+            var underlyingTs = MapPrimitiveTypeToTypeScript(CreateTypeInfo(type.UnderlyingType), readOnly);
             return $"{underlyingTs} | null";
         }
 
-        var baseType = MapPrimitiveTypeToTypeScript(type);
+        var baseType = MapPrimitiveTypeToTypeScript(type, readOnly);
 
         if (type is { IsNullable: true, IsValueType: false })
             return $"{baseType} | null";
@@ -546,8 +587,38 @@ public partial class JSBindingGenerator
         return baseType;
     }
 
-    private static string MapPrimitiveTypeToTypeScript(TypeInfo type)
+    private static string MapPrimitiveTypeToTypeScript(TypeInfo type, bool readOnly = false)
     {
+        if (type.SpecialType is SpecialType.System_Object)
+            return "any";
+
+        if (type is { IsGenericDictionary: true, KeyTypeSymbol: not null, ValueTypeSymbol: not null })
+        {
+            var keyTypeInfo = CreateTypeInfo(type.KeyTypeSymbol);
+            string tsKeyType;
+
+            if (keyTypeInfo.SpecialType == SpecialType.System_String)
+                tsKeyType = "string";
+            else if (IsNumericType(type.KeyTypeSymbol))
+                tsKeyType = "number";
+            else
+                return "any";
+
+            var valueTypeInfo = CreateTypeInfo(type.ValueTypeSymbol);
+            var tsValueType = MapTypeToTypeScript(valueTypeInfo, readOnly: readOnly);
+
+            var recordType = $"Record<{tsKeyType}, {tsValueType}>";
+            return readOnly ? $"Readonly<{recordType}>" : recordType;
+        }
+
+        if (type is { IsGenericCollection: true, ItemTypeSymbol: not null })
+        {
+            var itemTypeInfo = CreateTypeInfo(type.ItemTypeSymbol);
+            var tsItemType = MapTypeToTypeScript(itemTypeInfo, readOnly: readOnly);
+            var arrayType = $"{tsItemType}[]";
+            return readOnly ? $"readonly {arrayType}" : arrayType;
+        }
+
         switch (type.SpecialType)
         {
             case SpecialType.System_String:
@@ -615,12 +686,31 @@ public partial class JSBindingGenerator
                     : elementTypeName
             };
 
-            return $"{tsElementType}[]";
+            var arrayType = $"{tsElementType}[]";
+            return readOnly ? $"readonly {arrayType}" : arrayType;
         }
 
         var fullName = type.FullName.Replace("global::", "");
         var lastDot = fullName.LastIndexOf('.');
-        return lastDot >= 0 ? fullName.Substring(lastDot + 1) : fullName;
+        var typeName = lastDot >= 0 ? fullName.Substring(lastDot + 1) : fullName;
+
+        // Check if this type is a readonly JSObject
+        if (readOnly && IsReadOnlyJSObject(typeName))
+        {
+            return $"Readonly<{typeName}>";
+        }
+
+        return typeName;
+    }
+
+    private static bool IsReadOnlyJSObject(string typeName)
+    {
+        // Check if this type is tracked as a readonly JSObject in our dependencies
+        if (TypeDependencies.TryGetValue(typeName, out var dependency))
+        {
+            return dependency.IsReadOnly;
+        }
+        return false;
     }
 
     #endregion
@@ -726,6 +816,18 @@ public partial class JSBindingGenerator
         {
             var simpleName = ExtractSimpleTypeName(typeInfo.FullName);
             dependencies.Add(simpleName);
+            return;
+        }
+
+        if (typeInfo.IsGenericDictionary && typeInfo.ValueTypeSymbol != null)
+        {
+            AddTypeDependency(dependencies, CreateTypeInfo(typeInfo.ValueTypeSymbol));
+            return;
+        }
+
+        if (typeInfo.IsGenericCollection && typeInfo.ItemTypeSymbol != null)
+        {
+            AddTypeDependency(dependencies, CreateTypeInfo(typeInfo.ItemTypeSymbol));
             return;
         }
 

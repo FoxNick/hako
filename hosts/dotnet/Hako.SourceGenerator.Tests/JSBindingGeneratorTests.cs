@@ -92,6 +92,7 @@ namespace HakoJS.SourceGeneration
     [System.AttributeUsage(System.AttributeTargets.Class, Inherited = false)]
     public class JSObjectAttribute : System.Attribute
     {
+        public bool ReadOnly { get; set; } = true;
     }
 
 
@@ -336,6 +337,10 @@ namespace HakoJS.Extensions
         public static HakoJS.VM.JSValue NewArray(this HakoJS.VM.Realm ctx) { return new HakoJS.VM.JSValue(); }
         public static HakoJS.VM.Realm CreatePrototype<T>(this HakoJS.VM.Realm realm) where T : HakoJS.SourceGeneration.IJSBindable<T> { return realm; }
         public static HakoJS.VM.JSValue Unwrap(this HakoJS.VM.JSValue value) { return value; }
+        public static System.Collections.Generic.Dictionary<string, TValue> ToDictionary<TValue>(this HakoJS.VM.JSValue jsValue) { return new System.Collections.Generic.Dictionary<string, TValue>(); }
+        public static System.Collections.Generic.Dictionary<TKey, TValue> ToDictionary<TKey, TValue>(this HakoJS.VM.JSValue jsValue) where TKey : notnull { return new System.Collections.Generic.Dictionary<TKey, TValue>(); }
+        public static System.Collections.Generic.Dictionary<string, TValue> ToDictionaryOf<TValue>(this HakoJS.VM.JSValue jsValue) where TValue : HakoJS.SourceGeneration.IJSMarshalable<TValue> { return new System.Collections.Generic.Dictionary<string, TValue>(); }
+        public static System.Collections.Generic.Dictionary<TKey, TValue> ToDictionaryOf<TKey, TValue>(this HakoJS.VM.JSValue jsValue) where TKey : notnull where TValue : HakoJS.SourceGeneration.IJSMarshalable<TValue> { return new System.Collections.Generic.Dictionary<TKey, TValue>(); }
     }
 }
 ";
@@ -883,11 +888,11 @@ using HakoJS.SourceGeneration;
 using System.Collections.Generic;
 
 namespace TestNamespace;
-
+record NoSauce(string Zone);
 [JSObject]
 public partial record InvalidRecord(
     string Name,
-    Dictionary<string, int> Data
+    Dictionary<string, NoSauce> Data
 );
 ";
 
@@ -1122,11 +1127,12 @@ using System.Collections.Generic;
 
 namespace TestNamespace;
 
+class Hardhome {}
 [JSClass]
 public partial class TestClass
 {
     [JSProperty]
-    public Dictionary<string, int> Data { get; set; }
+    public Dictionary<string, Hardhome> Data { get; set; }
 }
 ";
 
@@ -1179,31 +1185,7 @@ public partial class TestClass
     #endregion
 
     #region Error Tests - HAKO013 (Unmarshalable Return Type)
-
-    [Fact]
-    public void ReportsErrorForUnmarshalableReturnType()
-    {
-        var source = @"
-using HakoJS.SourceGeneration;
-using System.Collections.Generic;
-
-namespace TestNamespace;
-
-[JSClass]
-public partial class TestClass
-{
-    [JSMethod]
-    public Dictionary<string, int> GetData() => null;
-}
-";
-
-        var result = RunGenerator(source);
-
-        var error = result.Diagnostics.FirstOrDefault(d => d.Id == "HAKO013");
-        Assert.NotNull(error);
-        Assert.Contains("cannot be marshaled", error.GetMessage());
-    }
-
+    
     [Fact]
     public void AllowsMarshalableReturnTypes()
     {
@@ -1419,7 +1401,7 @@ namespace TestNamespace;
 public partial class TestModule
 {
     [JSModuleMethod]
-    public static Dictionary<string, int> GetData() => null;
+    public static Dictionary<string, TestModule> GetData() => null;
 }
 ";
 
@@ -1447,7 +1429,7 @@ namespace TestNamespace;
 public partial class TestModule
 {
     [JSModuleValue]
-    public static Dictionary<string, int> Data = new();
+    public static Dictionary<string, TestModule> Data = new();
 }
 ";
 
@@ -3202,10 +3184,10 @@ public partial record DataSet(
 
         var generatedCode = result.GeneratedTrees[0].GetText().ToString();
 
-        Assert.Contains("numbers: number[];", generatedCode);
-        Assert.Contains("tags: string[];", generatedCode);
-        Assert.Contains("buffer: ArrayBuffer;", generatedCode);
-        Assert.Contains("optionalValues?: number[] | null;", generatedCode);
+        Assert.Contains("readonly numbers: readonly number[];", generatedCode);
+        Assert.Contains("readonly tags: readonly string[];", generatedCode);
+        Assert.Contains("readonly buffer: ArrayBuffer;", generatedCode);
+        Assert.Contains("readonly optionalValues?: readonly number[] | null;", generatedCode);
     }
 
     [Fact]
@@ -3341,14 +3323,14 @@ public partial record ComplexConfig(
         var generatedCode = result.GeneratedTrees[0].GetText().ToString();
 
         Assert.Contains("interface ComplexConfig {", generatedCode);
-        Assert.Contains("name: string;", generatedCode);
-        Assert.Contains("port: number;", generatedCode);
-        Assert.Contains("onStart: (arg0: string) => void;", generatedCode);
-        Assert.Contains("validator: (arg0: number) => Promise<boolean>;", generatedCode);
-        Assert.Contains("log: (message: string, level: number) => void;", generatedCode);
-        Assert.Contains("allowedPorts: number[];", generatedCode);
-        Assert.Contains("host?: string | null;", generatedCode);
-        Assert.Contains("enabled?: boolean;", generatedCode);
+        Assert.Contains("readonly name: string;", generatedCode);
+        Assert.Contains("readonly port: number;", generatedCode);
+        Assert.Contains("readonly onStart: (arg0: string) => void;", generatedCode);
+        Assert.Contains("readonly validator: (arg0: number) => Promise<boolean>;", generatedCode);
+        Assert.Contains("readonly log: (message: string, level: number) => void;", generatedCode);
+        Assert.Contains("readonly allowedPorts: readonly number[];", generatedCode);
+        Assert.Contains("readonly host?: string | null;", generatedCode);
+        Assert.Contains("readonly enabled?: boolean;", generatedCode);
     }
 
     #endregion
@@ -4952,7 +4934,7 @@ using HakoJS.SourceGeneration;
 
 namespace TestNamespace;
 
-[JSObject]
+[JSObject(ReadOnly = false]
 public partial record DataSet(
     int[] Numbers,
     string[] Tags,
@@ -5620,8 +5602,6 @@ public partial class LoggingModule
 
         var generatedCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
 
-
-
         // Should export enum as const object with string values
         Assert.Contains("export const LogLevel: {", generatedCode);
         Assert.Contains("readonly Debug: \"\"Debug\"\";", generatedCode);
@@ -5637,14 +5617,16 @@ public partial class LoggingModule
 
         // Should create enum object at runtime in C# code
         Assert.Contains("using var logLevelObj = realm.NewObject();", generatedCode);
-        Assert.Contains("logLevelObj.SetProperty(\"Debug\", realm.NewString(\"Debug\"));", generatedCode);
+        Assert.Contains("using var debugValue = realm.NewString(\"Debug\");", generatedCode);
+        Assert.Contains("logLevelObj.SetReadOnlyProperty(\"Debug\", debugValue);", generatedCode);
+        Assert.Contains("logLevelObj.Freeze(realm);", generatedCode);
         Assert.Contains("init.SetExport(\"LogLevel\", logLevelObj);", generatedCode);
     }
 
     [Fact]
-    public void GeneratesModuleFlagsEnumExport()
-    {
-        var source = @"
+public void GeneratesModuleFlagsEnumExport()
+{
+    var source = @"
 using HakoJS.SourceGeneration;
 using System;
 
@@ -5670,32 +5652,35 @@ public partial class FileSystemModule
 }
 ";
 
-        var result = RunGenerator(source);
+    var result = RunGenerator(source);
 
-        Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
 
-        var generatedCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
+    var generatedCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Module")).GetText().ToString();
 
-        // Extract TypeScript definition
-        var typeDefStart = generatedCode.IndexOf("return @\"", StringComparison.Ordinal) + 9;
-        var typeDefEnd = generatedCode.IndexOf("\";", typeDefStart, StringComparison.Ordinal);
-        var typeDef = generatedCode.Substring(typeDefStart, typeDefEnd - typeDefStart);
+    // Extract TypeScript definition
+    var typeDefStart = generatedCode.IndexOf("return @\"", StringComparison.Ordinal) + 9;
+    var typeDefEnd = generatedCode.IndexOf("\";", typeDefStart, StringComparison.Ordinal);
+    var typeDef = generatedCode.Substring(typeDefStart, typeDefEnd - typeDefStart);
 
-        // Should export enum as const object with number values
-        Assert.Contains("export const FileAccess: {", typeDef);
-        Assert.Contains("readonly None: 0;", typeDef);
-        Assert.Contains("readonly Read: 1;", typeDef);
-        Assert.Contains("readonly Write: 2;", typeDef);
-        Assert.Contains("readonly Execute: 4;", typeDef);
-        Assert.Contains("readonly All: 7;", typeDef);
-        Assert.Contains("};", typeDef);
-        Assert.Contains("export type FileAccess = typeof FileAccess[keyof typeof FileAccess];", typeDef);
+    // Should export enum as const object with number values
+    Assert.Contains("export const FileAccess: {", typeDef);
+    Assert.Contains("readonly None: 0;", typeDef);
+    Assert.Contains("readonly Read: 1;", typeDef);
+    Assert.Contains("readonly Write: 2;", typeDef);
+    Assert.Contains("readonly Execute: 4;", typeDef);
+    Assert.Contains("readonly All: 7;", typeDef);
+    Assert.Contains("};", typeDef);
+    Assert.Contains("export type FileAccess = typeof FileAccess[keyof typeof FileAccess];", typeDef);
 
-        // Should create enum object with number values in C# code
-        Assert.Contains("using var fileAccessObj = realm.NewObject();", generatedCode);
-        Assert.Contains("fileAccessObj.SetProperty(\"None\", realm.NewNumber(0));", generatedCode);
-        Assert.Contains("fileAccessObj.SetProperty(\"Read\", realm.NewNumber(1));", generatedCode);
-    }
+    // Should create enum object with number values in C# code
+    Assert.Contains("using var fileAccessObj = realm.NewObject();", generatedCode);
+    Assert.Contains("using var noneValue = realm.NewNumber(0);", generatedCode);
+    Assert.Contains("fileAccessObj.SetReadOnlyProperty(\"None\", noneValue);", generatedCode);
+    Assert.Contains("using var readValue = realm.NewNumber(1);", generatedCode);
+    Assert.Contains("fileAccessObj.SetReadOnlyProperty(\"Read\", readValue);", generatedCode);
+    Assert.Contains("fileAccessObj.Freeze(realm);", generatedCode);
+}
 
     [Fact]
     public void ReportsErrorForEnumWithoutJSEnumAttribute()
@@ -6073,4 +6058,408 @@ public partial class SecurityModule
     }
 
     #endregion
+    
+    #region Dictionary and Collection Tests
+
+[Fact]
+public void HandlesDictionaryWithStringKeys()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+using System.Collections.Generic;
+
+namespace TestNamespace;
+
+[JSClass]
+public partial class DataStore
+{
+    [JSProperty]
+    public Dictionary<string, int> Scores { get; set; }
+    
+    [JSMethod]
+    public Dictionary<string, string> GetData() => null;
+    
+    [JSMethod]
+    public void SetData(Dictionary<string, double> values) { }
+}
+";
+
+    var result = RunGenerator(source);
+
+    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+    
+    Assert.Contains("ToJSDictionary", generatedCode);
+    
+    Assert.Contains("ToDictionary", generatedCode);
+}
+
+[Fact]
+public void HandlesDictionaryWithNumericKeys()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+using System.Collections.Generic;
+
+namespace TestNamespace;
+
+[JSClass]
+public partial class IndexedData
+{
+    [JSProperty]
+    public Dictionary<int, string> Items { get; set; }
+    
+    [JSMethod]
+    public Dictionary<long, double> GetValues() => null;
+}
+";
+
+    var result = RunGenerator(source);
+
+    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+    Assert.Contains("ToJSDictionary", generatedCode);
+    Assert.Contains("ToDictionary", generatedCode);
+}
+
+[Fact]
+public void HandlesDictionaryWithMarshalableValues()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+using System.Collections.Generic;
+
+namespace TestNamespace;
+
+[JSObject]
+public partial record UserData(string Name, int Age);
+
+[JSClass]
+public partial class UserStore
+{
+    [JSProperty]
+    public Dictionary<string, UserData> Users { get; set; }
+    
+    [JSMethod]
+    public Dictionary<int, UserData> GetUsersById() => null;
+}
+";
+
+    var result = RunGenerator(source);
+
+    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+    var generatedCode = result.GeneratedTrees.First(t => t.FilePath.Contains("UserStore")).GetText().ToString();
+
+    // Should use ToJSDictionaryOf for marshalable types
+    Assert.Contains("ToJSDictionaryOf", generatedCode);
+    Assert.Contains("ToDictionaryOf", generatedCode);
+}
+
+[Fact]
+public void HandlesListCollections()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+using System.Collections.Generic;
+
+namespace TestNamespace;
+
+[JSClass]
+public partial class ListManager
+{
+    [JSProperty]
+    public List<int> Numbers { get; set; }
+    
+    [JSProperty]
+    public List<string> Names { get; set; }
+    
+    [JSMethod]
+    public List<double> GetValues() => null;
+    
+    [JSMethod]
+    public void SetItems(List<bool> flags) { }
+}
+";
+
+    var result = RunGenerator(source);
+
+    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+    // Should use ToJSArray for marshaling
+    Assert.Contains("ToJSArray", generatedCode);
+    
+    // Should use ToArray for unmarshaling
+    Assert.Contains("ToArray", generatedCode);
+}
+
+[Fact]
+public void HandlesIEnumerableCollections()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+using System.Collections.Generic;
+
+namespace TestNamespace;
+
+[JSClass]
+public partial class EnumerableManager
+{
+    [JSProperty]
+    public IEnumerable<string> Items { get; set; }
+    
+    [JSMethod]
+    public IReadOnlyList<int> GetReadOnlyList() => null;
+}
+";
+
+    var result = RunGenerator(source);
+
+    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+    Assert.Contains("ToJSArray", generatedCode);
+    Assert.Contains("ToArray", generatedCode);
+}
+
+[Fact]
+public void HandlesListWithMarshalableItems()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+using System.Collections.Generic;
+
+namespace TestNamespace;
+
+[JSObject]
+public partial record Item(string Name, int Value);
+
+[JSClass]
+public partial class ItemManager
+{
+    [JSProperty]
+    public List<Item> Items { get; set; }
+    
+    [JSMethod]
+    public IEnumerable<Item> GetAll() => null;
+}
+";
+
+    var result = RunGenerator(source);
+
+    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+    var generatedCode = result.GeneratedTrees.First(t => t.FilePath.Contains("ItemManager")).GetText().ToString();
+
+    // Should use ToJSArrayOf for marshalable types
+    Assert.Contains("ToJSArrayOf", generatedCode);
+    Assert.Contains("ToArrayOf", generatedCode);
+}
+
+[Fact]
+public void HandlesDictionariesInRecords()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+using System.Collections.Generic;
+
+namespace TestNamespace;
+
+[JSObject]
+public partial record ConfigData(
+    string Name,
+    Dictionary<string, string> Settings,
+    List<int> Ports
+);
+";
+
+    var result = RunGenerator(source);
+
+    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+    // ToJSValue should marshal dictionary and list with intermediate disposal
+    Assert.Contains("using var SettingsValue = Settings.ToJSDictionary<string, string>(realm);", generatedCode);
+    Assert.Contains("obj.SetProperty(\"settings\", SettingsValue);", generatedCode);
+    Assert.Contains("using var PortsValue = Ports.ToJSArray<int>(realm);", generatedCode);
+    Assert.Contains("obj.SetProperty(\"ports\", PortsValue);", generatedCode);
+
+    // FromJSValue should unmarshal
+    Assert.Contains("ToDictionary<string, string>", generatedCode);
+    Assert.Contains("ToArray<int>", generatedCode);
+    
+    // Should not freeze by default (ReadOnly defaults to true but let's verify the structure is correct)
+    Assert.Contains("obj.Freeze(realm);", generatedCode);
+}
+
+[Fact]
+public void HandlesDictionariesInModules()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+using System.Collections.Generic;
+
+namespace TestNamespace;
+
+[JSModule]
+public partial class DataModule
+{
+    [JSModuleValue]
+    public static Dictionary<string, int> DefaultScores = new();
+    
+    [JSModuleMethod]
+    public static Dictionary<string, string> GetConfig() => null;
+    
+    [JSModuleMethod]
+    public static void UpdateScores(Dictionary<string, int> scores) { }
+}
+";
+
+    var result = RunGenerator(source);
+
+    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+    Assert.Contains("ToJSDictionary", generatedCode);
+    Assert.Contains("ToDictionary", generatedCode);
+}
+
+[Fact]
+public void GeneratesTypeScriptRecordForDictionary()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+using System.Collections.Generic;
+
+namespace TestNamespace;
+
+[JSClass]
+public partial class TypedData
+{
+    [JSProperty]
+    public Dictionary<string, int> StringKeyedData { get; set; }
+    
+    [JSProperty]
+    public Dictionary<int, string> NumberKeyedData { get; set; }
+    
+    [JSProperty]
+    public Dictionary<string, double>? NullableDict { get; set; }
+}
+";
+
+    var result = RunGenerator(source);
+
+    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+    // Should map to TypeScript Record type
+    Assert.Contains("stringKeyedData: Record<string, number>;", generatedCode);
+    Assert.Contains("numberKeyedData: Record<number, string>;", generatedCode);
+    Assert.Contains("nullableDict: Record<string, number> | null;", generatedCode);
+}
+
+[Fact]
+public void GeneratesTypeScriptArrayForList()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+using System.Collections.Generic;
+
+namespace TestNamespace;
+
+[JSObject]
+public partial record Item(string Name);
+
+[JSClass]
+public partial class Collections
+{
+    [JSProperty]
+    public List<int> Numbers { get; set; }
+    
+    [JSProperty]
+    public IEnumerable<string> Strings { get; set; }
+    
+    [JSProperty]
+    public List<Item> Items { get; set; }
+}
+";
+
+    var result = RunGenerator(source);
+
+    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+    var generatedCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Collections")).GetText().ToString();
+
+    // Should map to TypeScript array type
+    Assert.Contains("numbers: number[];", generatedCode);
+    Assert.Contains("strings: string[];", generatedCode);
+    Assert.Contains("items: Item[];", generatedCode);
+}
+
+[Fact]
+public void ReportsErrorForDictionaryWithInvalidKeyType()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+using System.Collections.Generic;
+
+namespace TestNamespace;
+
+[JSClass]
+public partial class InvalidData
+{
+    [JSProperty]
+    public Dictionary<bool, string> BoolKeyedData { get; set; }
+}
+";
+
+    var result = RunGenerator(source);
+
+    var error = result.Diagnostics.FirstOrDefault(d => d.Id == "HAKO012");
+    Assert.NotNull(error);
+    Assert.Contains("cannot be marshaled", error.GetMessage());
+}
+
+[Fact]
+public void HandlesNestedDictionariesAndLists()
+{
+    var source = @"
+using HakoJS.SourceGeneration;
+using System.Collections.Generic;
+
+namespace TestNamespace;
+
+[JSClass]
+public partial class NestedData
+{
+    [JSProperty]
+    public Dictionary<string, List<int>> GroupedNumbers { get; set; }
+    
+    [JSMethod]
+    public List<Dictionary<string, string>> GetNestedData() => null;
+}
+";
+
+    var result = RunGenerator(source);
+
+    Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
+
+    var generatedCode = result.GeneratedTrees[0].GetText().ToString();
+
+    // Should handle nested structures
+    Assert.Contains("ToJSDictionary", generatedCode);
+    Assert.Contains("ToDictionary", generatedCode);
+}
+
+#endregion
+    
 }

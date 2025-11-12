@@ -906,6 +906,43 @@ public sealed class JSValue(Realm realm, int handle, ValueLifecycle lifecycle = 
     }
 
     /// <summary>
+    /// Internal method to set a property value using a JSValue key.
+    /// </summary>
+    private bool SetPropertyInternal<T>(JSValue keyValue, T value) where T : notnull
+    {
+        JSValue? valueVm = null;
+
+        try
+        {
+            int valuePtr;
+            if (value is JSValue vmValue)
+            {
+                valuePtr = vmValue.GetHandle();
+            }
+            else
+            {
+                valueVm = Realm.NewValue(value);
+                valuePtr = valueVm.GetHandle();
+            }
+
+            var result = Realm.Runtime.Registry.SetProp(
+                Realm.Pointer, _handle, keyValue.GetHandle(), valuePtr);
+
+            if (result == -1)
+            {
+                var error = Realm.GetLastError();
+                if (error is not null) throw new HakoException("Error setting property", error);
+            }
+
+            return result == 1;
+        }
+        finally
+        {
+            valueVm?.Dispose();
+        }
+    }
+
+    /// <summary>
     /// Sets a property value by name.
     /// </summary>
     /// <typeparam name="T">The type of the value to set.</typeparam>
@@ -972,6 +1009,7 @@ public sealed class JSValue(Realm realm, int handle, ValueLifecycle lifecycle = 
         }
     }
 
+
     /// <summary>
     /// Sets a property value by numeric index.
     /// </summary>
@@ -981,47 +1019,171 @@ public sealed class JSValue(Realm realm, int handle, ValueLifecycle lifecycle = 
     /// <returns><c>true</c> if the property was set successfully; <c>false</c> otherwise.</returns>
     /// <exception cref="HakoUseAfterFreeException">The value has been disposed.</exception>
     /// <exception cref="HakoException">An error occurred setting the property.</exception>
-    /// <remarks>
-    /// This is typically used for setting array elements.
-    /// </remarks>
     public bool SetProperty<T>(int index, T value) where T : notnull
     {
         AssertAlive();
+        using var keyValue = Realm.NewValue(index);
+        return SetPropertyInternal(keyValue, value);
+    }
 
-        JSValue? keyValue = null;
-        JSValue? valueVm = null;
+    /// <summary>
+    /// Sets a property value by numeric index.
+    /// </summary>
+    /// <typeparam name="T">The type of the value to set.</typeparam>
+    /// <param name="index">The numeric index.</param>
+    /// <param name="value">The value to set. Can be a .NET value or a <see cref="JSValue"/>.</param>
+    /// <returns><c>true</c> if the property was set successfully; <c>false</c> otherwise.</returns>
+    /// <exception cref="HakoUseAfterFreeException">The value has been disposed.</exception>
+    /// <exception cref="HakoException">An error occurred setting the property.</exception>
+    public bool SetProperty<T>(long index, T value) where T : notnull
+    {
+        AssertAlive();
+        using var keyValue = Realm.NewValue(index);
+        return SetPropertyInternal(keyValue, value);
+    }
 
-        try
-        {
-            keyValue = Realm.NewValue(index);
+    /// <summary>
+    /// Sets a property value by numeric index.
+    /// </summary>
+    /// <typeparam name="T">The type of the value to set.</typeparam>
+    /// <param name="index">The numeric index.</param>
+    /// <param name="value">The value to set. Can be a .NET value or a <see cref="JSValue"/>.</param>
+    /// <returns><c>true</c> if the property was set successfully; <c>false</c> otherwise.</returns>
+    /// <exception cref="HakoUseAfterFreeException">The value has been disposed.</exception>
+    /// <exception cref="HakoException">An error occurred setting the property.</exception>
+    public bool SetProperty<T>(short index, T value) where T : notnull
+    {
+        AssertAlive();
+        using var keyValue = Realm.NewValue(index);
+        return SetPropertyInternal(keyValue, value);
+    }
 
-            int valuePtr;
-            if (value is JSValue vmValue)
-            {
-                valuePtr = vmValue.GetHandle();
-            }
-            else
-            {
-                valueVm = Realm.NewValue(value);
-                valuePtr = valueVm.GetHandle();
-            }
+    /// <summary>
+    /// Sets a property value by numeric index.
+    /// </summary>
+    /// <typeparam name="T">The type of the value to set.</typeparam>
+    /// <param name="index">The numeric index.</param>
+    /// <param name="value">The value to set. Can be a .NET value or a <see cref="JSValue"/>.</param>
+    /// <returns><c>true</c> if the property was set successfully; <c>false</c> otherwise.</returns>
+    /// <exception cref="HakoUseAfterFreeException">The value has been disposed.</exception>
+    /// <exception cref="HakoException">An error occurred setting the property.</exception>
+    public bool SetProperty<T>(byte index, T value) where T : notnull
+    {
+        AssertAlive();
+        using var keyValue = Realm.NewValue(index);
+        return SetPropertyInternal(keyValue, value);
+    }
 
-            var result = Realm.Runtime.Registry.SetProp(
-                Realm.Pointer, _handle, keyValue.GetHandle(), valuePtr);
+    /// <summary>
+    /// Sets a property value by numeric index.
+    /// </summary>
+    /// <typeparam name="T">The type of the value to set.</typeparam>
+    /// <param name="index">The numeric index.</param>
+    /// <param name="value">The value to set. Can be a .NET value or a <see cref="JSValue"/>.</param>
+    /// <returns><c>true</c> if the property was set successfully; <c>false</c> otherwise.</returns>
+    /// <exception cref="HakoUseAfterFreeException">The value has been disposed.</exception>
+    /// <exception cref="HakoException">An error occurred setting the property.</exception>
+    public bool SetProperty<T>(uint index, T value) where T : notnull
+    {
+        AssertAlive();
+        using var keyValue = Realm.NewValue(index);
+        return SetPropertyInternal(keyValue, value);
+    }
 
-            if (result == -1)
-            {
-                var error = Realm.GetLastError();
-                if (error is not null) throw new HakoException("Error setting property", error);
-            }
+    /// <summary>
+    /// Sets a property value by numeric index.
+    /// </summary>
+    /// <typeparam name="T">The type of the value to set.</typeparam>
+    /// <param name="index">The numeric index.</param>
+    /// <param name="value">The value to set. Can be a .NET value or a <see cref="JSValue"/>.</param>
+    /// <returns><c>true</c> if the property was set successfully; <c>false</c> otherwise.</returns>
+    /// <exception cref="HakoUseAfterFreeException">The value has been disposed.</exception>
+    /// <exception cref="HakoException">An error occurred setting the property.</exception>
+    public bool SetProperty<T>(ulong index, T value) where T : notnull
+    {
+        AssertAlive();
+        using var keyValue = Realm.NewValue(index);
+        return SetPropertyInternal(keyValue, value);
+    }
 
-            return result == 1;
-        }
-        finally
-        {
-            keyValue?.Dispose();
-            valueVm?.Dispose();
-        }
+    /// <summary>
+    /// Sets a property value by numeric index.
+    /// </summary>
+    /// <typeparam name="T">The type of the value to set.</typeparam>
+    /// <param name="index">The numeric index.</param>
+    /// <param name="value">The value to set. Can be a .NET value or a <see cref="JSValue"/>.</param>
+    /// <returns><c>true</c> if the property was set successfully; <c>false</c> otherwise.</returns>
+    /// <exception cref="HakoUseAfterFreeException">The value has been disposed.</exception>
+    /// <exception cref="HakoException">An error occurred setting the property.</exception>
+    public bool SetProperty<T>(ushort index, T value) where T : notnull
+    {
+        AssertAlive();
+        using var keyValue = Realm.NewValue(index);
+        return SetPropertyInternal(keyValue, value);
+    }
+
+    /// <summary>
+    /// Sets a property value by numeric index.
+    /// </summary>
+    /// <typeparam name="T">The type of the value to set.</typeparam>
+    /// <param name="index">The numeric index.</param>
+    /// <param name="value">The value to set. Can be a .NET value or a <see cref="JSValue"/>.</param>
+    /// <returns><c>true</c> if the property was set successfully; <c>false</c> otherwise.</returns>
+    /// <exception cref="HakoUseAfterFreeException">The value has been disposed.</exception>
+    /// <exception cref="HakoException">An error occurred setting the property.</exception>
+    public bool SetProperty<T>(sbyte index, T value) where T : notnull
+    {
+        AssertAlive();
+        using var keyValue = Realm.NewValue(index);
+        return SetPropertyInternal(keyValue, value);
+    }
+
+    /// <summary>
+    /// Sets a property value by numeric index.
+    /// </summary>
+    /// <typeparam name="T">The type of the value to set.</typeparam>
+    /// <param name="index">The numeric index.</param>
+    /// <param name="value">The value to set. Can be a .NET value or a <see cref="JSValue"/>.</param>
+    /// <returns><c>true</c> if the property was set successfully; <c>false</c> otherwise.</returns>
+    /// <exception cref="HakoUseAfterFreeException">The value has been disposed.</exception>
+    /// <exception cref="HakoException">An error occurred setting the property.</exception>
+    public bool SetProperty<T>(double index, T value) where T : notnull
+    {
+        AssertAlive();
+        using var keyValue = Realm.NewValue(index);
+        return SetPropertyInternal(keyValue, value);
+    }
+
+    /// <summary>
+    /// Sets a property value by numeric index.
+    /// </summary>
+    /// <typeparam name="T">The type of the value to set.</typeparam>
+    /// <param name="index">The numeric index.</param>
+    /// <param name="value">The value to set. Can be a .NET value or a <see cref="JSValue"/>.</param>
+    /// <returns><c>true</c> if the property was set successfully; <c>false</c> otherwise.</returns>
+    /// <exception cref="HakoUseAfterFreeException">The value has been disposed.</exception>
+    /// <exception cref="HakoException">An error occurred setting the property.</exception>
+    public bool SetProperty<T>(float index, T value) where T : notnull
+    {
+        AssertAlive();
+        using var keyValue = Realm.NewValue(index);
+        return SetPropertyInternal(keyValue, value);
+    }
+
+    /// <summary>
+    /// Sets a property value by numeric index.
+    /// </summary>
+    /// <typeparam name="T">The type of the value to set.</typeparam>
+    /// <param name="index">The numeric index.</param>
+    /// <param name="value">The value to set. Can be a .NET value or a <see cref="JSValue"/>.</param>
+    /// <returns><c>true</c> if the property was set successfully; <c>false</c> otherwise.</returns>
+    /// <exception cref="HakoUseAfterFreeException">The value has been disposed.</exception>
+    /// <exception cref="HakoException">An error occurred setting the property.</exception>
+    public bool SetProperty<T>(decimal index, T value) where T : notnull
+    {
+        AssertAlive();
+        using var keyValue = Realm.NewValue(index);
+        return SetPropertyInternal(keyValue, value);
     }
 
     #endregion
@@ -1203,7 +1365,7 @@ public sealed class JSValue(Realm realm, int handle, ValueLifecycle lifecycle = 
         if (bufPtr == 0)
         {
             var error = Realm.GetLastError();
-            if (error != null) throw error;
+            if (error != null) throw new HakoException("Error copying typed array", error);
         }
 
         try
@@ -1235,7 +1397,7 @@ public sealed class JSValue(Realm realm, int handle, ValueLifecycle lifecycle = 
         if (bufPtr == 0)
         {
             var error = Realm.GetLastError();
-            if (error != null) throw error;
+            if (error != null) throw new HakoException("Error copying arraybuffer", error);
         }
 
         try
@@ -1400,7 +1562,7 @@ public sealed class JSValue(Realm realm, int handle, ValueLifecycle lifecycle = 
         if (result == -1)
         {
             var error = Realm.GetLastError();
-            if (error != null) throw error;
+            if (error != null) throw new HakoException("Error checking instance of type", error);
         }
 
         return result is 1;
@@ -1444,7 +1606,7 @@ public sealed class JSValue(Realm realm, int handle, ValueLifecycle lifecycle = 
         if (error != null)
         {
             Realm.FreeValuePointer(jsonPtr);
-            throw error;
+            throw new  HakoException("Error converting string to json", error);
         }
 
         using var json = new JSValue(Realm, jsonPtr);

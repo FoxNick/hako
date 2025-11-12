@@ -31,8 +31,8 @@ public partial class JSBindingGenerator
         public readonly MarshalableModel? Model = model;
         public readonly ImmutableArray<Diagnostic> Diagnostics = diagnostics;
     }
-    
-        
+
+
     private readonly struct EnumResult(EnumModel? model, ImmutableArray<Diagnostic> diagnostics)
     {
         public readonly EnumModel? Model = model;
@@ -77,6 +77,8 @@ public partial class JSBindingGenerator
         public List<RecordParameterModel> Parameters { get; set; } = new();
         public string TypeScriptDefinition { get; set; } = "";
         public string? Documentation { get; set; }
+        
+        public bool ReadOnly { get; set; } = true;
     }
 
     private class MarshalableModel
@@ -89,6 +91,7 @@ public partial class JSBindingGenerator
         public bool IsNested { get; set; }
         public string? ParentClassName { get; set; }
         public string TypeKind { get; set; } = "class";
+        public bool ReadOnly { get; set; } = false;
     }
 
     private class MarshalablePropertyModel
@@ -171,6 +174,8 @@ public partial class JSBindingGenerator
         public string TypeScriptDefinition { get; set; } = "";
         public string? Documentation { get; set; }
         public List<RecordParameterModel> Parameters { get; set; } = new();
+        
+        public bool ReadOnly { get; set; } = true;
     }
 
     private class ParameterModel
@@ -214,7 +219,15 @@ public partial class JSBindingGenerator
         SpecialType specialType,
         ITypeSymbol? underlyingType,
         bool isEnum,
-        bool isFlags)
+        bool isFlags,
+        bool isGenericDictionary,
+        string? keyType,
+        string? valueType,
+        ITypeSymbol? keyTypeSymbol,
+        ITypeSymbol? valueTypeSymbol,
+        bool isGenericCollection,
+        string? itemType,
+        ITypeSymbol? itemTypeSymbol)
     {
         public readonly string FullName = fullName;
         public readonly bool IsNullable = isNullable;
@@ -225,6 +238,14 @@ public partial class JSBindingGenerator
         public readonly ITypeSymbol? UnderlyingType = underlyingType;
         public readonly bool IsEnum = isEnum;
         public readonly bool IsFlags = isFlags;
+        public readonly bool IsGenericDictionary = isGenericDictionary;
+        public readonly string? KeyType = keyType;
+        public readonly string? ValueType = valueType;
+        public readonly ITypeSymbol? KeyTypeSymbol = keyTypeSymbol;
+        public readonly ITypeSymbol? ValueTypeSymbol = valueTypeSymbol;
+        public readonly bool IsGenericCollection = isGenericCollection;
+        public readonly string? ItemType = itemType;
+        public readonly ITypeSymbol? ItemTypeSymbol = itemTypeSymbol;
     }
 
     private class TypeDependency
@@ -232,6 +253,7 @@ public partial class JSBindingGenerator
         public string TypeName { get; set; } = "";
         public string ModuleName { get; set; } = "";
         public bool IsFromModule { get; set; }
+        public bool IsReadOnly { get; set; }
     }
 
     private class EnumModel
@@ -245,7 +267,7 @@ public partial class JSBindingGenerator
         public string? Documentation { get; set; }
         public Accessibility DeclaredAccessibility { get; set; } = Accessibility.Public;
     }
-    
+
     private class EnumValueModel
     {
         public string Name { get; set; } = "";
@@ -264,6 +286,6 @@ public partial class JSBindingGenerator
         public List<EnumValueModel> Values { get; set; } = new();
         public bool IsFlags { get; set; }
     }
-    
+
     #endregion
 }

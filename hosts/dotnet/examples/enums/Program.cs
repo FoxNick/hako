@@ -32,6 +32,9 @@ modResult.Dispose();
 
 // C# 14
 Console.WriteLine(FileAccess.TypeDefinition);
+Console.WriteLine(LogEntry.TypeDefinition);
+Console.WriteLine(FileSystemModule.TypeDefinition);
+
 
 // Example 3
 var entry = new LogEntry("Test", LogLevel.Info);
@@ -57,9 +60,7 @@ await Hako.ShutdownAsync();
 [JSEnum]
 internal enum LogLevel { Debug, Info, Warning, Error }
 
-[Flags]
-[JSEnum]
-internal enum FileAccess { None = 0, Read = 1, Write = 2, Execute = 4 }
+
 
 // Classes
 [JSClass]
@@ -72,9 +73,12 @@ internal partial class Logger
 internal partial record LogEntry(string Message, LogLevel Level);
 
 [JSModule(Name = "fs")]
-[JSModuleEnum(EnumType = typeof(FileAccess))]
 internal partial class FileSystemModule
 {
+    [Flags]
+    [JSEnum]
+    internal enum FileAccess { None = 0, Read = 1, Write = 2, Execute = 4 }
+    
     [JSModuleMethod]
     public static void SetPermissions(string path, FileAccess access)
         => Console.WriteLine($"Set {path}: {access} ({(int)access})");

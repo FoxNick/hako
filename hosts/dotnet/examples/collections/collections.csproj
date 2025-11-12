@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <LangVersion>preview</LangVersion>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\Hako.Backend.Wasmtime\Hako.Backend.Wasmtime.csproj" />
+        <ProjectReference Include="..\..\Hako\Hako.csproj" />
+        <ProjectReference Include="..\..\Hako.SourceGenerator\Hako.SourceGenerator.csproj" OutputItemType="Analyzer"  ReferenceOutputAssembly="false"/>
+    </ItemGroup>
+
+</Project>

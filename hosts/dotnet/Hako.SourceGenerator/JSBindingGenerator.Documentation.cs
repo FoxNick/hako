@@ -38,7 +38,7 @@ public partial class JSBindingGenerator
             }
         }
 
-        if (paramDocs != null && paramDocs.Count > 0)
+        if (paramDocs is { Count: > 0 })
         {
             if (!string.IsNullOrWhiteSpace(documentation))
                 sb.AppendLine($"{indentStr} *");
@@ -69,7 +69,7 @@ public partial class JSBindingGenerator
 
         if (!string.IsNullOrWhiteSpace(returnDoc))
         {
-            if (!string.IsNullOrWhiteSpace(documentation) || (paramDocs != null && paramDocs.Count > 0))
+            if (!string.IsNullOrWhiteSpace(documentation) || paramDocs is { Count: > 0 })
                 sb.AppendLine($"{indentStr} *");
 
             var returnLines = returnDoc.Split('\n');
