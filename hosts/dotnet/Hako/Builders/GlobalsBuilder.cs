@@ -464,7 +464,7 @@ public class GlobalsBuilder
             HttpResponseMessage response;
             try
             {
-                response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+                response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
             }
             catch
             {
@@ -490,17 +490,17 @@ public class GlobalsBuilder
                 .WithReadOnly("type", "basic")
                 .WithFunctionAsync("text", async (realm, _, __) =>
                 {
-                    var text = await response.Content.ReadAsStringAsync();
+                    var text = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                     return realm.NewString(text);
                 })
                 .WithFunctionAsync("json", async (realm, _, __) =>
                 {
-                    var json = await response.Content.ReadAsStringAsync();
+                    var json = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                     return realm.ParseJson(json);
                 })
                 .WithFunctionAsync("arrayBuffer", async (realm, _, __) =>
                 {
-                    var bytes = await response.Content.ReadAsByteArrayAsync();
+                    var bytes = await response.Content.ReadAsByteArrayAsync().ConfigureAwait(false);
                     return realm.NewArrayBuffer(bytes);
                 })
                 .WithProperty("headers", headers); // Pass the underlying JSValue
