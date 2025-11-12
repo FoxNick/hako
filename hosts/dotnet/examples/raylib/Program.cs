@@ -25,17 +25,18 @@ public class Program
         runtime.ConfigureModules()
             .WithModule<RaylibModule>()
             .Apply();
-
-        File.WriteAllText("raylib.d.ts" ,RaylibModule.TypeDefinition);
+        
+        // ReSharper disable once MethodHasAsyncOverload
+        File.WriteAllText("raylib.d.ts", RaylibModule.TypeDefinition);
 
         using var realm = runtime.CreateRealm().WithGlobals(g => g.WithConsole());
+        // ReSharper disable once MethodHasAsyncOverload
         var tsCode = File.ReadAllText(ScriptFileName);
 
         StartScriptExecution(realm, tsCode);
         RunMainThreadLoop();
         ProcessRemainingActions();
         
-       
         await Hako.ShutdownAsync();
 
         Console.WriteLine("Application closed.");
@@ -43,15 +44,15 @@ public class Program
 
     private static void StartScriptExecution(Realm realm, string code)
     {
-        _ = Task.Run(() =>
+        _ = Task.Run(async () =>
         {
             try
             {
-                realm.EvalCode(code, new()
+                using var result = await realm.EvalAsync(code, new()
                 {
                     Type = EvalType.Module,
                     FileName = ScriptFileName
-                }).Dispose();
+                });
             }
             catch (Exception ex)
             {

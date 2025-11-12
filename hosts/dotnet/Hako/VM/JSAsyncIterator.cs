@@ -122,7 +122,7 @@ public sealed class JSAsyncIterator : IAsyncDisposable, IAsyncEnumerable<Disposa
         _handle = null;
 
         _disposed = true;
-        await Task.CompletedTask;
+        await Task.CompletedTask.ConfigureAwait(false);
     }
 
     /// <summary>
@@ -193,7 +193,7 @@ public sealed class JSAsyncIterator : IAsyncDisposable, IAsyncEnumerable<Disposa
         // Lazily retrieve and cache the 'next' method
         if (_next == null) _next = _handle!.GetProperty("next");
 
-        var result = await CallAsyncIteratorMethodAsync(_next, null);
+        var result = await CallAsyncIteratorMethodAsync(_next, null).ConfigureAwait(false);
 
         if (result.IsDone) return false;
 
@@ -244,12 +244,12 @@ public sealed class JSAsyncIterator : IAsyncDisposable, IAsyncEnumerable<Disposa
         using var returnMethod = _handle!.GetProperty("return");
         if (returnMethod.IsUndefined() && value == null)
         {
-            await DisposeAsync();
+            await DisposeAsync().ConfigureAwait(false);
             return;
         }
 
-        await CallAsyncIteratorMethodAsync(returnMethod, value);
-        await DisposeAsync();
+        await CallAsyncIteratorMethodAsync(returnMethod, value).ConfigureAwait(false);
+        await DisposeAsync().ConfigureAwait(false);
     }
 
     /// <summary>
@@ -317,7 +317,7 @@ public sealed class JSAsyncIterator : IAsyncDisposable, IAsyncEnumerable<Disposa
                 errorHandle = Context.NewError(error!);
 
             throwMethod = _handle!.GetProperty("throw");
-            await CallAsyncIteratorMethodAsync(throwMethod, errorHandle);
+            await CallAsyncIteratorMethodAsync(throwMethod, errorHandle).ConfigureAwait(false);
         }
         finally
         {
@@ -325,7 +325,7 @@ public sealed class JSAsyncIterator : IAsyncDisposable, IAsyncEnumerable<Disposa
             if (errorValue == null && errorHandle?.Alive == true) errorHandle.Dispose();
 
             throwMethod?.Dispose();
-            await DisposeAsync();
+            await DisposeAsync().ConfigureAwait(false);
         }
     }
 
@@ -339,7 +339,7 @@ public sealed class JSAsyncIterator : IAsyncDisposable, IAsyncEnumerable<Disposa
         // If an error occurred, dispose the iterator and return the error
         if (callResult.TryGetFailure(out var error))
         {
-            await DisposeAsync();
+            await DisposeAsync().ConfigureAwait(false);
             return new AsyncIteratorMethodResult(callResult, true);
         }
 
@@ -350,7 +350,7 @@ public sealed class JSAsyncIterator : IAsyncDisposable, IAsyncEnumerable<Disposa
         DisposableResult<JSValue, JSValue> promiseResult;
         try
         {
-            promiseResult = await Context.ResolvePromise(resultPromise);
+            promiseResult = await Context.ResolvePromise(resultPromise).ConfigureAwait(false);
         }
         finally
         {
@@ -360,7 +360,7 @@ public sealed class JSAsyncIterator : IAsyncDisposable, IAsyncEnumerable<Disposa
         // If promise rejected, dispose the iterator and return the error
         if (promiseResult.TryGetFailure(out var promiseError))
         {
-            await DisposeAsync();
+            await DisposeAsync().ConfigureAwait(false);
             return new AsyncIteratorMethodResult(promiseResult, true);
         }
 
@@ -375,7 +375,7 @@ public sealed class JSAsyncIterator : IAsyncDisposable, IAsyncEnumerable<Disposa
         {
             // If done, dispose resources
             resultValue.Dispose();
-            await DisposeAsync();
+            await DisposeAsync().ConfigureAwait(false);
             return new AsyncIteratorMethodResult(null, true);
         }
 
@@ -452,7 +452,7 @@ public sealed class JSAsyncIterator : IAsyncDisposable, IAsyncEnumerable<Disposa
         public async ValueTask<bool> MoveNextAsync()
         {
             _cancellationToken.ThrowIfCancellationRequested();
-            return await _iterator.MoveNextAsync();
+            return await _iterator.MoveNextAsync().ConfigureAwait(false);
         }
 
         /// <summary>

@@ -334,7 +334,7 @@ internal sealed class HakoEventLoop : IDisposable
     {
         if (!_disposed)
         {
-            await _shutdownCts.CancelAsync();
+            await _shutdownCts.CancelAsync().ConfigureAwait(false);
             _workQueue.Writer.Complete();
         }
 

@@ -342,7 +342,7 @@ public sealed class Realm : IDisposable
         // If not on event loop, marshal there first
         if (!Hako.Dispatcher.CheckAccess())
             return await Hako.Dispatcher.InvokeAsync(() => ResolvePromise(promiseLikeHandle, cancellationToken),
-                cancellationToken);
+                cancellationToken).ConfigureAwait(false);
 
         if (!promiseLikeHandle.IsPromise())
             throw new InvalidOperationException($"Expected a Promise-like value, received {promiseLikeHandle.Type}");
@@ -395,12 +395,12 @@ public sealed class Realm : IDisposable
         await Hako.Dispatcher.Yield();
 
         if (tcs.Task.IsCompleted)
-            return await tcs.Task;
+            return await tcs.Task.ConfigureAwait(false);
 
         while (!tcs.Task.IsCompleted && !cancellationToken.IsCancellationRequested)
             await Hako.Dispatcher.Yield();
 
-        return await tcs.Task;
+        return await tcs.Task.ConfigureAwait(false);
     }
 
     #endregion

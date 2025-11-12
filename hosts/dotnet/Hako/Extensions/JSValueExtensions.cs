@@ -294,7 +294,7 @@ public static class JSValueExtensions
         {
             if (!jsValue.IsPromise()) return jsValue;
 
-            using var resolved = await jsValue.Realm.ResolvePromise(jsValue, cancellationToken);
+            using var resolved = await jsValue.Realm.ResolvePromise(jsValue, cancellationToken).ConfigureAwait(false);
             if (resolved.TryGetFailure(out var failure))
             {
                 var jsException = jsValue.Realm.GetLastError(failure.GetHandle());
@@ -306,17 +306,17 @@ public static class JSValueExtensions
             }
 
             return resolved.Unwrap();
-        }, cancellationToken);
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     public static async Task<TValue> Await<TValue>(this JSValue jsValue, CancellationToken cancellationToken = default)
     {
         return await Hako.Dispatcher.InvokeAsync(async () =>
         {
-            using var result = await Await(jsValue, cancellationToken);
+            using var result = await Await(jsValue, cancellationToken).ConfigureAwait(false);
             using var nativeBox = result.ToNativeValue<TValue>();
             return nativeBox.Value;
-        }, cancellationToken);
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     internal static async Task<JSValue> InvokeAsyncInternal(JSValue jsValue, JSValue? thisArg, object?[] args)
@@ -352,7 +352,7 @@ public static class JSValueExtensions
 
                 if (result.IsPromise())
                 {
-                    using var resolved = await realm.ResolvePromise(result);
+                    using var resolved = await realm.ResolvePromise(result).ConfigureAwait(false);
                     if (resolved.TryGetFailure(out var failure))
                     {
                         var jsException = realm.GetLastError(failure.GetHandle());
@@ -375,7 +375,7 @@ public static class JSValueExtensions
                 foreach (var arg in jsArgs)
                     arg.Dispose();
             }
-        });
+        }).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -426,7 +426,7 @@ public static class JSValueExtensions
     {
         using var scope = new DisposableScope();
         scope.Defer(value);
-        return await action(value, scope);
+        return await action(value, scope).ConfigureAwait(false);
     }
 
 
@@ -437,7 +437,7 @@ public static class JSValueExtensions
 
     internal static async Task<TResult> InvokeAsyncInternal<TResult>(JSValue jsValue, JSValue? thisArg, object?[] args)
     {
-        using var result = await InvokeAsyncInternal(jsValue, thisArg, args);
+        using var result = await InvokeAsyncInternal(jsValue, thisArg, args).ConfigureAwait(false);
         using var nativeBox = result.ToNativeValue<TResult>();
         return nativeBox.Value;
     }
@@ -508,7 +508,7 @@ public static class JSValueExtensions
 
         using var scope = new DisposableScope();
         scope.Defer(value);
-        await action(value, scope);
+        await action(value, scope).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -1211,7 +1211,7 @@ public static class JSValueExtensions
         var realm = context ?? value.Realm;
 
         // Get the iterator
-        var iteratorResult = await Hako.Dispatcher.InvokeAsync(() => realm.GetAsyncIterator(value), cancellationToken);
+        var iteratorResult = await Hako.Dispatcher.InvokeAsync(() => realm.GetAsyncIterator(value), cancellationToken).ConfigureAwait(false);
 
         if (iteratorResult.TryGetFailure(out var error))
         {
@@ -1239,11 +1239,11 @@ public static class JSValueExtensions
                 // Yield back to event loop while waiting - this allows jobs and timers to run
                 while (!moveNextTask.IsCompleted) await Hako.Dispatcher.Yield();
 
-                var hasNext = await moveNextTask;
+                var hasNext = await moveNextTask.ConfigureAwait(false);
                 var current = hasNext ? iterator.Current : null;
 
                 return (hasNext, current);
-            }, cancellationToken);
+            }, cancellationToken).ConfigureAwait(false);
 
             if (!hasNext)
                 break;
@@ -1285,7 +1285,7 @@ public static class JSValueExtensions
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var realm = context ?? value.Realm;
-        await foreach (var itemResult in value.IterateAsync(realm, cancellationToken))
+        await foreach (var itemResult in value.IterateAsync(realm, cancellationToken).ConfigureAwait(false))
         {
             if (itemResult.TryGetFailure(out var error))
             {
@@ -1326,7 +1326,7 @@ public static class JSValueExtensions
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var realm = context ?? map.Realm;
-        await foreach (var entryResult in map.IterateAsync(realm, cancellationToken))
+        await foreach (var entryResult in map.IterateAsync(realm, cancellationToken).ConfigureAwait(false))
         {
             if (entryResult.TryGetFailure(out var error))
             {
@@ -1367,7 +1367,7 @@ public static class JSValueExtensions
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var realm = context ?? set.Realm;
-        await foreach (var entryResult in set.IterateAsync(realm, cancellationToken))
+        await foreach (var entryResult in set.IterateAsync(realm, cancellationToken).ConfigureAwait(false))
         {
             if (entryResult.TryGetFailure(out var error))
             {

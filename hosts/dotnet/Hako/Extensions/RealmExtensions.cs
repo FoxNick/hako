@@ -114,7 +114,7 @@ public static Task<JSValue> EvalAsync(
         JSValue evaluated;
         if (value.IsPromise())
         {
-            using var resolved = await context.ResolvePromise(value, cancellationToken);
+            using var resolved = await context.ResolvePromise(value, cancellationToken).ConfigureAwait(false);
             if (resolved.TryGetFailure(out var failure))
             {
                 var jsException = context.GetLastError(failure.GetHandle());
@@ -185,10 +185,10 @@ public static Task<JSValue> EvalAsync(
     {
         return await Hako.Dispatcher.InvokeAsync(async () =>
         {
-            using var result = await EvalAsync(context, code, options, cancellationToken);
+            using var result = await EvalAsync(context, code, options, cancellationToken).ConfigureAwait(false);
             using var nativeBox = result.ToNativeValue<TValue>();
             return nativeBox.Value;
-        }, cancellationToken);
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -381,7 +381,7 @@ public static async Task<T> UseScopeAsync<T>(this Realm realm, Func<Realm, Dispo
     ArgumentNullException.ThrowIfNull(action);
     
     using var scope = new DisposableScope();
-    return await action(realm, scope);
+    return await action(realm, scope).ConfigureAwait(false);
 }
 
 /// <summary>
@@ -449,7 +449,7 @@ public static async Task UseScopeAsync(this Realm realm, Func<Realm, DisposableS
     ArgumentNullException.ThrowIfNull(action);
     
     using var scope = new DisposableScope();
-    await action(realm, scope);
+    await action(realm, scope).ConfigureAwait(false);
 }
 
 }
