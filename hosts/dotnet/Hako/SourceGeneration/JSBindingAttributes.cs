@@ -144,6 +144,15 @@ public sealed class JSIgnoreAttribute : Attribute
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]
 public sealed class JSObjectAttribute : Attribute
 {
+    /// <summary>
+    /// Indicates if the marshaled JSObject should be immutable. Defaults to true.
+    /// </summary>
+    public bool ReadOnly { get; set; }
+
+    public JSObjectAttribute(bool readOnly = true)
+    {
+        ReadOnly = readOnly;
+    }
 }
 
 

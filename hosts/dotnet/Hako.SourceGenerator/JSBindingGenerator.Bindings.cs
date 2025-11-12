@@ -557,18 +557,27 @@ public partial class JSBindingGenerator
         foreach (var enumRef in model.EnumReferences)
         {
             sb.AppendLine($"            using var {ToCamelCase(enumRef.SimpleName)}Obj = realm.NewObject();");
+            
             foreach (var value in enumRef.Values)
+            {
                 if (enumRef.IsFlags)
-                    // Flags enum - number values
-                    sb.AppendLine(
-                        $"            {ToCamelCase(enumRef.SimpleName)}Obj.SetProperty(\"{value.JsName}\", realm.NewNumber({value.Value}));");
+                {
+                    // Flags enum - number values as readonly properties
+                    sb.AppendLine($"            using var {ToCamelCase(value.JsName)}Value = realm.NewNumber({value.Value});");
+                    sb.AppendLine($"            {ToCamelCase(enumRef.SimpleName)}Obj.SetReadOnlyProperty(\"{value.JsName}\", {ToCamelCase(value.JsName)}Value);");
+                }
                 else
-                    // Regular enum - string values
-                    sb.AppendLine(
-                        $"            {ToCamelCase(enumRef.SimpleName)}Obj.SetProperty(\"{value.JsName}\", realm.NewString(\"{value.Name}\"));");
-
-            sb.AppendLine(
-                $"            init.SetExport(\"{enumRef.ExportName}\", {ToCamelCase(enumRef.SimpleName)}Obj);");
+                {
+                    // Regular enum - string values as readonly properties
+                    sb.AppendLine($"            using var {ToCamelCase(value.JsName)}Value = realm.NewString(\"{value.Name}\");");
+                    sb.AppendLine($"            {ToCamelCase(enumRef.SimpleName)}Obj.SetReadOnlyProperty(\"{value.JsName}\", {ToCamelCase(value.JsName)}Value);");
+                }
+            }
+            
+            // Freeze the enum object to make it completely immutable
+            sb.AppendLine($"            {ToCamelCase(enumRef.SimpleName)}Obj.Freeze(realm);");
+            sb.AppendLine($"            init.SetExport(\"{enumRef.ExportName}\", {ToCamelCase(enumRef.SimpleName)}Obj);");
+            
             if (enumRef != model.EnumReferences.Last() || model.Values.Any() || model.Methods.Any())
                 sb.AppendLine();
         }

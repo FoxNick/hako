@@ -3,6 +3,7 @@
     <Project Path="examples\basics\basics.csproj" Type="Classic C#" />
     <Project Path="examples\bytecode\bytecode.csproj" Type="Classic C#" />
     <Project Path="examples\classes\classes.csproj" Type="Classic C#" />
+    <Project Path="examples\collections\collections.csproj" Type="Classic C#" />
     <Project Path="examples\enums\enums.csproj" Type="Classic C#" />
     <Project Path="examples\host-functions\host-functions.csproj" Type="Classic C#" />
     <Project Path="examples\iteration\iteration.csproj" Type="Classic C#" />

@@ -67,6 +67,27 @@ public partial class JSBindingGenerator
         return sb.ToString();
     }
 
+    private static bool NeedsIntermediateDisposal(TypeInfo typeInfo)
+    {
+        // Collections and arrays always need disposal
+        if (typeInfo.IsArray || typeInfo.IsGenericCollection || typeInfo.IsGenericDictionary)
+            return true;
+
+        // Primitives and strings don't create new JSValues that need disposal
+        return typeInfo.SpecialType switch
+        {
+            SpecialType.System_Boolean or SpecialType.System_Char or
+                SpecialType.System_SByte or SpecialType.System_Byte or
+                SpecialType.System_Int16 or SpecialType.System_UInt16 or
+                SpecialType.System_Int32 or SpecialType.System_UInt32 or
+                SpecialType.System_Int64 or SpecialType.System_UInt64 or
+                SpecialType.System_Single or SpecialType.System_Double or
+                SpecialType.System_DateTime or
+                SpecialType.System_String => false,
+            _ => true // Custom types, enums, etc. need disposal
+        };
+    }
+
     private static void GenerateObjectToJSValue(StringBuilder sb, ObjectModel model)
     {
         sb.AppendLine("    public global::HakoJS.VM.JSValue ToJSValue(global::HakoJS.VM.Realm realm)");
@@ -76,24 +97,55 @@ public partial class JSBindingGenerator
         sb.AppendLine("        {");
 
         foreach (var param in model.Parameters)
+        {
             if (param.IsDelegate && param.DelegateInfo != null)
             {
                 GenerateDelegateToFunction(sb, param, "            ");
             }
             else
             {
-                if (param.TypeInfo.IsNullable && !param.TypeInfo.IsValueType)
+                var marshalCode = GetMarshalCode(param.TypeInfo, param.Name, "realm");
+
+                // Check if marshaling creates a new JSValue that needs disposal
+                if (NeedsIntermediateDisposal(param.TypeInfo))
                 {
-                    sb.AppendLine($"            if ({param.Name} != null)");
-                    sb.AppendLine(
-                        $"                obj.SetProperty(\"{param.JsName}\", {GetMarshalCode(param.TypeInfo, param.Name, "realm")});");
+                    var tempVarName = $"{param.Name}Value";
+
+                    if (param.TypeInfo is { IsNullable: true, IsValueType: false })
+                    {
+                        sb.AppendLine($"            if ({param.Name} != null)");
+                        sb.AppendLine($"            {{");
+                        sb.AppendLine($"                using var {tempVarName} = {marshalCode};");
+                        sb.AppendLine($"                obj.SetProperty(\"{param.JsName}\", {tempVarName});");
+                        sb.AppendLine($"            }}");
+                    }
+                    else
+                    {
+                        sb.AppendLine($"            using var {tempVarName} = {marshalCode};");
+                        sb.AppendLine($"            obj.SetProperty(\"{param.JsName}\", {tempVarName});");
+                    }
                 }
                 else
                 {
-                    sb.AppendLine(
-                        $"            obj.SetProperty(\"{param.JsName}\", {GetMarshalCode(param.TypeInfo, param.Name, "realm")});");
+                    // Primitives don't need intermediate disposal
+                    if (param.TypeInfo is { IsNullable: true, IsValueType: false })
+                    {
+                        sb.AppendLine($"            if ({param.Name} != null)");
+                        sb.AppendLine($"                obj.SetProperty(\"{param.JsName}\", {marshalCode});");
+                    }
+                    else
+                    {
+                        sb.AppendLine($"            obj.SetProperty(\"{param.JsName}\", {marshalCode});");
+                    }
                 }
             }
+        }
+
+        // Freeze the object if ReadOnly is true
+        if (model.ReadOnly)
+        {
+            sb.AppendLine("            obj.Freeze(realm);");
+        }
 
         sb.AppendLine("            return obj;");
         sb.AppendLine("        }");
@@ -110,7 +162,7 @@ public partial class JSBindingGenerator
         var delegateInfo = param.DelegateInfo!;
         var funcType = delegateInfo.IsAsync ? "NewFunctionAsync" : "NewFunction";
 
-        if (param.TypeInfo.IsNullable && !param.TypeInfo.IsValueType)
+        if (param.TypeInfo is { IsNullable: true, IsValueType: false })
         {
             sb.AppendLine($"{indent}if ({param.Name} != null)");
             sb.AppendLine($"{indent}{{");
@@ -195,7 +247,7 @@ public partial class JSBindingGenerator
         sb.AppendLine($"{indent}}});");
         sb.AppendLine($"{indent}obj.SetProperty(\"{param.JsName}\", {param.Name}Func);");
 
-        if (param.TypeInfo.IsNullable && !param.TypeInfo.IsValueType)
+        if (param.TypeInfo is { IsNullable: true, IsValueType: false })
         {
             indent = indent.Substring(0, indent.Length - 4);
             sb.AppendLine($"{indent}}}");
@@ -619,6 +671,62 @@ public partial class JSBindingGenerator
 
     private static string GetStrictUnmarshalCode(TypeInfo type, string jsValueName, string contextVarName = "ctx")
     {
+        if (type.SpecialType is SpecialType.System_Object)
+            return $"{jsValueName}.GetNativeValue<object>()";
+
+        if (type is { IsGenericDictionary: true, KeyTypeSymbol: not null, ValueTypeSymbol: not null })
+        {
+            var keyTypeInfo = CreateTypeInfo(type.KeyTypeSymbol);
+            var isKeyValid = keyTypeInfo.SpecialType == SpecialType.System_String ||
+                             IsNumericType(type.KeyTypeSymbol);
+
+            if (isKeyValid)
+            {
+                var isValueMarshalable = ImplementsIJSMarshalable(type.ValueTypeSymbol) ||
+                                         HasAttribute(type.ValueTypeSymbol,
+                                             "HakoJS.SourceGeneration.JSClassAttribute") ||
+                                         HasAttribute(type.ValueTypeSymbol,
+                                             "HakoJS.SourceGeneration.JSObjectAttribute");
+
+                if (isValueMarshalable)
+                    return $"{jsValueName}.ToDictionaryOf<{type.KeyType}, {type.ValueType}>()";
+
+                return $"{jsValueName}.ToDictionary<{type.KeyType}, {type.ValueType}>()";
+            }
+
+            return $"{jsValueName}.GetNativeValue<object>()";
+        }
+
+        if (type is { IsGenericCollection: true, ItemTypeSymbol: not null })
+        {
+            var isItemMarshalable = ImplementsIJSMarshalable(type.ItemTypeSymbol) ||
+                                    HasAttribute(type.ItemTypeSymbol, "HakoJS.SourceGeneration.JSClassAttribute") ||
+                                    HasAttribute(type.ItemTypeSymbol, "HakoJS.SourceGeneration.JSObjectAttribute");
+
+            var arrayMethod = isItemMarshalable ? "ToArrayOf" : "ToArray";
+            var arrayExpr = $"{jsValueName}.{arrayMethod}<{type.ItemType}>()";
+
+            // Check the specific collection type and convert appropriately
+            var typeDefinition = type.FullName.Replace("global::", "");
+            if (typeDefinition.StartsWith("System.Collections.Generic.List<"))
+            {
+                // For List<T>, wrap the array in a List constructor
+                return $"new {type.FullName}({arrayExpr})";
+            }
+            else if (typeDefinition.StartsWith("System.Collections.Generic.IList<") ||
+                     typeDefinition.StartsWith("System.Collections.Generic.ICollection<") ||
+                     typeDefinition.StartsWith("System.Collections.Generic.IEnumerable<") ||
+                     typeDefinition.StartsWith("System.Collections.Generic.IReadOnlyList<") ||
+                     typeDefinition.StartsWith("System.Collections.Generic.IReadOnlyCollection<"))
+            {
+                // For interfaces, the array can be used directly (implicit conversion)
+                return arrayExpr;
+            }
+
+            // Fallback for other collection types
+            return arrayExpr;
+        }
+
         switch (type.SpecialType)
         {
             case SpecialType.System_String:
@@ -770,6 +878,83 @@ public partial class JSBindingGenerator
 
     private static string GetMarshalCodeForPrimitive(TypeInfo type, string valueName, string ctxName)
     {
+        if (type.SpecialType is SpecialType.System_Object)
+            return $"{ctxName}.NewValue({valueName})";
+
+        if (type.IsGenericDictionary && type.KeyTypeSymbol != null && type.ValueTypeSymbol != null)
+        {
+            bool isKeyValid = type.KeyTypeSymbol.SpecialType == SpecialType.System_String ||
+                              IsNumericType(type.KeyTypeSymbol);
+
+            if (isKeyValid)
+            {
+                bool isValueMarshalable = ImplementsIJSMarshalable(type.ValueTypeSymbol) ||
+                                          HasAttribute(type.ValueTypeSymbol,
+                                              "HakoJS.SourceGeneration.JSClassAttribute") ||
+                                          HasAttribute(type.ValueTypeSymbol,
+                                              "HakoJS.SourceGeneration.JSObjectAttribute");
+
+                if (type.IsNullable && !type.IsValueType)
+                {
+                    if (isValueMarshalable)
+                    {
+                        return
+                            $"({valueName} == null ? {ctxName}.Null() : {valueName}.ToJSDictionaryOf<{type.KeyType}, {type.ValueType}>({ctxName}))";
+                    }
+                    else
+                    {
+                        return
+                            $"({valueName} == null ? {ctxName}.Null() : {valueName}.ToJSDictionary<{type.KeyType}, {type.ValueType}>({ctxName}))";
+                    }
+                }
+                else
+                {
+                    if (isValueMarshalable)
+                    {
+                        return $"{valueName}.ToJSDictionaryOf<{type.KeyType}, {type.ValueType}>({ctxName})";
+                    }
+                    else
+                    {
+                        return $"{valueName}.ToJSDictionary<{type.KeyType}, {type.ValueType}>({ctxName})";
+                    }
+                }
+            }
+
+            return $"{ctxName}.NewValue({valueName})";
+        }
+
+        if (type.IsGenericCollection && type.ItemTypeSymbol != null)
+        {
+            bool isItemMarshalable = ImplementsIJSMarshalable(type.ItemTypeSymbol) ||
+                                     HasAttribute(type.ItemTypeSymbol, "HakoJS.SourceGeneration.JSClassAttribute") ||
+                                     HasAttribute(type.ItemTypeSymbol, "HakoJS.SourceGeneration.JSObjectAttribute");
+
+            if (type.IsNullable && !type.IsValueType)
+            {
+                if (isItemMarshalable)
+                {
+                    return
+                        $"({valueName} == null ? {ctxName}.Null() : {valueName}.ToJSArrayOf<{type.ItemType}>({ctxName}))";
+                }
+                else
+                {
+                    return
+                        $"({valueName} == null ? {ctxName}.Null() : {valueName}.ToJSArray<{type.ItemType}>({ctxName}))";
+                }
+            }
+            else
+            {
+                if (isItemMarshalable)
+                {
+                    return $"{valueName}.ToJSArrayOf<{type.ItemType}>({ctxName})";
+                }
+                else
+                {
+                    return $"{valueName}.ToJSArray<{type.ItemType}>({ctxName})";
+                }
+            }
+        }
+
         switch (type.SpecialType)
         {
             case SpecialType.System_String:

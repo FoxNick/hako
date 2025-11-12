@@ -5,7 +5,6 @@ using System.Text;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 
 namespace HakoJS.SourceGenerator;
@@ -16,7 +15,6 @@ public partial class JSBindingGenerator
 
     private static EnumResult GetEnumModel(GeneratorAttributeSyntaxContext context, CancellationToken ct)
     {
-    
         if (context.TargetSymbol is not INamedTypeSymbol enumSymbol)
             return new EnumResult(null, ImmutableArray<Diagnostic>.Empty);
 
@@ -26,7 +24,7 @@ public partial class JSBindingGenerator
             return new EnumResult(null, diagnostics.ToImmutable());
 
         var jsEnumName = GetJsEnumName(enumSymbol);
-        
+
         var isFlags = enumSymbol.GetAttributes()
             .Any(a => a.AttributeClass?.ToDisplayString() == "System.FlagsAttribute");
 
@@ -47,9 +45,9 @@ public partial class JSBindingGenerator
 
         var documentation = ExtractXmlDocumentation(enumSymbol);
         var typeScriptDefinition = GenerateEnumTypeScriptDefinition(
-            jsEnumName, 
-            values, 
-            isFlags, 
+            jsEnumName,
+            values,
+            isFlags,
             documentation);
 
         var model = new EnumModel
@@ -89,7 +87,8 @@ public partial class JSBindingGenerator
 
     private static string GenerateEnumBinding(
         EnumModel model,
-        (Platform Platform, OptimizationLevel OptimizationLevel, string? AssemblyName, LanguageVersion? LanguageVersion) compilationSettings)
+        (Platform Platform, OptimizationLevel OptimizationLevel, string? AssemblyName,
+            Microsoft.CodeAnalysis.CSharp.LanguageVersion? LanguageVersion) compilationSettings)
     {
         var sb = new StringBuilder();
 
@@ -98,12 +97,12 @@ public partial class JSBindingGenerator
         sb.AppendLine();
         sb.AppendLine("using HakoJS.SourceGeneration;");
         sb.AppendLine();
-        
+
         if (!string.IsNullOrEmpty(model.SourceNamespace))
             sb.AppendLine($"namespace {model.SourceNamespace};");
 
         sb.AppendLine();
-        
+
         var accessibility = GetAccessibilityModifier(model.DeclaredAccessibility);
         var useCSharp14Extensions = compilationSettings.LanguageVersion is >= LanguageVersion.CSharp14;
 
@@ -118,12 +117,12 @@ public partial class JSBindingGenerator
             sb.AppendLine("        {");
             sb.AppendLine("            get");
             sb.AppendLine("            {");
-            
+
             var escapedTypeScript = model.TypeScriptDefinition.Replace("\"", "\"\"");
             sb.AppendLine("                return @\"");
             sb.Append(escapedTypeScript);
             sb.AppendLine("\";");
-            
+
             sb.AppendLine("            }");
             sb.AppendLine("        }");
             sb.AppendLine("    }");
@@ -136,12 +135,12 @@ public partial class JSBindingGenerator
             sb.AppendLine("{");
             sb.AppendLine($"    {accessibility} static string GetTypeDefinition()");
             sb.AppendLine("    {");
-            
+
             var escapedTypeScript = model.TypeScriptDefinition.Replace("\"", "\"\"");
             sb.AppendLine("        return @\"");
             sb.Append(escapedTypeScript);
             sb.AppendLine("\";");
-            
+
             sb.AppendLine("    }");
             sb.AppendLine("}");
         }
@@ -150,9 +149,10 @@ public partial class JSBindingGenerator
     }
 
     private static void GenerateEnumSource(
-        SourceProductionContext context, 
+        SourceProductionContext context,
         EnumModel model,
-        (Platform Platform, OptimizationLevel OptimizationLevel, string? AssemblyName, LanguageVersion? LanguageVersion) compilationSettings)
+        (Platform Platform, OptimizationLevel OptimizationLevel, string? AssemblyName, LanguageVersion? LanguageVersion)
+            compilationSettings)
     {
         var source = GenerateEnumBinding(model, compilationSettings);
         context.AddSource($"{model.EnumName}.Enum.g.cs", SourceText.From(source, Encoding.UTF8));

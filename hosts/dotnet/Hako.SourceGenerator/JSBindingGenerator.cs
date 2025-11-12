@@ -20,9 +20,8 @@ public partial class JSBindingGenerator : IIncrementalGenerator
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        
         var settings = context.CompilationProvider
-            .Select((c, _)  => 
+            .Select((c, _) =>
             {
                 // Assuming this is a C# project, this should be true!
                 LanguageVersion? csharpVersion = c is CSharpCompilation comp
@@ -35,7 +34,7 @@ public partial class JSBindingGenerator : IIncrementalGenerator
                     c.AssemblyName,
                     LanguageVersion: csharpVersion);
             });
-        
+
         var classProviderWithDiagnostics = context.SyntaxProvider
             .ForAttributeWithMetadataName(JSClassAttributeName, (node, _) => node is ClassDeclarationSyntax,
                 GetClassModel);
@@ -179,7 +178,7 @@ public partial class JSBindingGenerator : IIncrementalGenerator
             .Select((result, _) => result.Model!);
 
         context.RegisterSourceOutput(marshalableProvider, GenerateMarshalableSource);
-        
+
         var enumProviderWithDiagnostics = context.SyntaxProvider
             .ForAttributeWithMetadataName(
                 "HakoJS.SourceGeneration.JSEnumAttribute",
@@ -191,12 +190,11 @@ public partial class JSBindingGenerator : IIncrementalGenerator
         var validEnumModels = enumProviderWithDiagnostics
             .Where(result => result.Model != null)
             .Select((result, _) => result.Model!);
-        
+
         var enumModelsWithSettings = validEnumModels.Combine(settings);
 
-        context.RegisterSourceOutput(enumModelsWithSettings, static (ctx, data) => 
+        context.RegisterSourceOutput(enumModelsWithSettings, static (ctx, data) =>
             GenerateEnumSource(ctx, data.Left, data.Right));
-    
     }
 
     #region Diagnostic Descriptors
@@ -311,7 +309,6 @@ public partial class JSBindingGenerator : IIncrementalGenerator
         "HAKO022", "Invalid module enum reference",
         "Type '{0}' referenced in [JSModuleEnum] is not an enum or does not have the [JSEnum] attribute",
         "HakoJS.SourceGenerator", DiagnosticSeverity.Error, true);
-
     #endregion
 
     #region Model Extraction Methods
@@ -361,59 +358,175 @@ public partial class JSBindingGenerator : IIncrementalGenerator
     }
 
     private static ModuleResult GetModuleModel(GeneratorAttributeSyntaxContext context, CancellationToken ct)
+{
+    if (context.TargetSymbol is not INamedTypeSymbol classSymbol)
+        return new ModuleResult(null, ImmutableArray<Diagnostic>.Empty);
+
+    var diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
+    var location = classSymbol.Locations.FirstOrDefault() ?? Location.None;
+
+    if (!IsPartialClass(classSymbol, ct))
     {
-        if (context.TargetSymbol is not INamedTypeSymbol classSymbol)
-            return new ModuleResult(null, ImmutableArray<Diagnostic>.Empty);
-
-        var diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
-        var location = classSymbol.Locations.FirstOrDefault() ?? Location.None;
-
-        if (!IsPartialClass(classSymbol, ct))
-        {
-            diagnostics.Add(Diagnostic.Create(NonPartialModuleError, location, classSymbol.Name));
-            return new ModuleResult(null, diagnostics.ToImmutable());
-        }
-
-        var moduleAttr = context.Attributes[0];
-        var moduleName = GetModuleName(moduleAttr, classSymbol.Name);
-
-        var values = FindModuleValues(classSymbol, moduleName, diagnostics);
-        var methods = FindModuleMethods(classSymbol, moduleName, diagnostics);
-        var classReferences = FindModuleClassReferences(classSymbol, diagnostics);
-        var interfaceReferences = FindModuleInterfaceReferences(classSymbol, diagnostics);
-        var enumReferences = FindModuleEnumReferences(classSymbol, diagnostics);
-
-        ValidateModuleExports(moduleName, location, values, methods, classReferences, interfaceReferences,
-            enumReferences, diagnostics);
-
-        if (diagnostics.Count > 0)
-            return new ModuleResult(null, diagnostics.ToImmutable());
-
-        var documentation = ExtractXmlDocumentation(classSymbol);
-        var typeScriptDefinition =
-            GenerateModuleTypeScriptDefinition(moduleName, values, methods, classReferences, interfaceReferences,
-                enumReferences,
-                documentation);
-
-        var model = new ModuleModel
-        {
-            ClassName = classSymbol.Name,
-            SourceNamespace = classSymbol.ContainingNamespace.IsGlobalNamespace
-                ? string.Empty
-                : classSymbol.ContainingNamespace.ToDisplayString(),
-            ModuleName = moduleName,
-            Location = location,
-            Values = values,
-            Methods = methods,
-            ClassReferences = classReferences,
-            InterfaceReferences = interfaceReferences,
-            EnumReferences = enumReferences,
-            TypeScriptDefinition = typeScriptDefinition,
-            Documentation = documentation
-        };
-
-        return new ModuleResult(model, diagnostics.ToImmutable());
+        diagnostics.Add(Diagnostic.Create(NonPartialModuleError, location, classSymbol.Name));
+        return new ModuleResult(null, diagnostics.ToImmutable());
     }
+
+    var moduleAttr = context.Attributes[0];
+    var moduleName = GetModuleName(moduleAttr, classSymbol.Name);
+
+    var values = FindModuleValues(classSymbol, moduleName, diagnostics);
+    var methods = FindModuleMethods(classSymbol, moduleName, diagnostics);
+    var classReferences = FindModuleClassReferences(classSymbol, diagnostics);
+    var interfaceReferences = FindModuleInterfaceReferences(classSymbol, diagnostics);
+    var enumReferences = FindModuleEnumReferences(classSymbol, diagnostics);
+
+    // Auto-detect nested types and add them to the module
+    foreach (var nestedType in classSymbol.GetTypeMembers())
+    {
+        var fullTypeName = nestedType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        
+        // Auto-detect nested JSClass
+        if (HasAttribute(nestedType, JSClassAttributeName))
+        {
+            if (classReferences.All(c => c.FullTypeName != fullTypeName))
+            {
+                var jsClassName = GetJsClassNameFromSymbol(nestedType);
+                var nestedProperties = FindProperties(nestedType, ImmutableArray.CreateBuilder<Diagnostic>());
+                var nestedMethods = FindMethods(nestedType, ImmutableArray.CreateBuilder<Diagnostic>());
+                var nestedConstructor = FindConstructor(nestedType);
+                var nestedClassDoc = ExtractXmlDocumentation(nestedType);
+
+                var classTypeScriptDef = GenerateClassTypeScriptDefinition(
+                    jsClassName, nestedConstructor, nestedProperties, nestedMethods, nestedClassDoc, moduleName, nestedType);
+
+                classReferences.Add(new ModuleClassReference
+                {
+                    FullTypeName = fullTypeName,
+                    SimpleName = nestedType.Name,
+                    ExportName = nestedType.Name,
+                    TypeScriptDefinition = classTypeScriptDef,
+                    Documentation = nestedClassDoc,
+                    Constructor = nestedConstructor,
+                    Properties = nestedProperties,
+                    Methods = nestedMethods
+                });
+            }
+        }
+        
+        // Auto-detect nested JSObject
+        if (HasAttribute(nestedType, JSObjectAttributeName))
+        {
+            if (interfaceReferences.All(i => i.FullTypeName != fullTypeName))
+            {
+                var nestedParameters = FindRecordParameters(nestedType, ImmutableArray.CreateBuilder<Diagnostic>());
+                var nestedObjectDoc = ExtractXmlDocumentation(nestedType);
+                
+                var objectAttribute = nestedType.GetAttributes()
+                    .FirstOrDefault(a => a.AttributeClass?.Name == "JSObjectAttribute");
+                var isReadOnly = true;
+                if (objectAttribute != null)
+                {
+                    foreach (var arg in objectAttribute.NamedArguments)
+                    {
+                        if (arg is { Key: "ReadOnly", Value.Value: bool readOnlyValue })
+                        {
+                            isReadOnly = readOnlyValue;
+                            break;
+                        }
+                    }
+                }
+                
+                var interfaceTypeScriptDef = GenerateObjectTypeScriptDefinition(
+                    nestedType.Name, 
+                    nestedParameters, 
+                    nestedObjectDoc,
+                    isReadOnly);
+
+                interfaceReferences.Add(new ModuleInterfaceReference
+                {
+                    FullTypeName = fullTypeName,
+                    SimpleName = nestedType.Name,
+                    ExportName = nestedType.Name,
+                    TypeScriptDefinition = interfaceTypeScriptDef,
+                    Documentation = nestedObjectDoc,
+                    Parameters = nestedParameters
+                });
+            }
+        }
+        
+        // Auto-detect nested JSEnum
+        if (nestedType.TypeKind == TypeKind.Enum && 
+            HasAttribute(nestedType, "HakoJS.SourceGeneration.JSEnumAttribute"))
+        {
+            if (enumReferences.All(e => e.FullTypeName != fullTypeName))
+            {
+                var jsEnumName = GetJsEnumName(nestedType);
+                var isFlags = nestedType.GetAttributes()
+                    .Any(a => a.AttributeClass?.ToDisplayString() == "System.FlagsAttribute");
+
+                var enumValues = new List<EnumValueModel>();
+                foreach (var member in nestedType.GetMembers().OfType<IFieldSymbol>())
+                {
+                    if (member.IsImplicitlyDeclared || !member.HasConstantValue)
+                        continue;
+
+                    enumValues.Add(new EnumValueModel
+                    {
+                        Name = member.Name,
+                        JsName = member.Name,
+                        Value = member.ConstantValue ?? 0,
+                        Documentation = ExtractXmlDocumentation(member)
+                    });
+                }
+
+                var nestedEnumDoc = ExtractXmlDocumentation(nestedType);
+                var enumTypeScriptDef = GenerateEnumTypeScriptDefinition(jsEnumName, enumValues, isFlags, nestedEnumDoc);
+
+                enumReferences.Add(new ModuleEnumReference
+                {
+                    FullTypeName = fullTypeName,
+                    SimpleName = nestedType.Name,
+                    ExportName = jsEnumName,
+                    TypeScriptDefinition = enumTypeScriptDef,
+                    Documentation = nestedEnumDoc,
+                    Values = enumValues,
+                    IsFlags = isFlags
+                });
+            }
+        }
+    }
+
+    ValidateModuleExports(moduleName, location, values, methods, classReferences, interfaceReferences,
+        enumReferences, diagnostics);
+
+    if (diagnostics.Count > 0)
+        return new ModuleResult(null, diagnostics.ToImmutable());
+
+    var documentation = ExtractXmlDocumentation(classSymbol);
+    var typeScriptDefinition =
+        GenerateModuleTypeScriptDefinition(moduleName, values, methods, classReferences, interfaceReferences,
+            enumReferences,
+            documentation);
+
+    var model = new ModuleModel
+    {
+        ClassName = classSymbol.Name,
+        SourceNamespace = classSymbol.ContainingNamespace.IsGlobalNamespace
+            ? string.Empty
+            : classSymbol.ContainingNamespace.ToDisplayString(),
+        ModuleName = moduleName,
+        Location = location,
+        Values = values,
+        Methods = methods,
+        ClassReferences = classReferences,
+        InterfaceReferences = interfaceReferences,
+        EnumReferences = enumReferences,
+        TypeScriptDefinition = typeScriptDefinition,
+        Documentation = documentation
+    };
+
+    return new ModuleResult(model, diagnostics.ToImmutable());
+}
 
     private static ObjectResult GetObjectModel(GeneratorAttributeSyntaxContext context, CancellationToken ct)
     {
@@ -440,14 +553,29 @@ public partial class JSBindingGenerator : IIncrementalGenerator
             diagnostics.Add(Diagnostic.Create(NonPartialRecordError, location, typeSymbol.Name));
             return new ObjectResult(null, diagnostics.ToImmutable());
         }
-
+        
+        var objectAttribute = context.TargetSymbol .GetAttributes().FirstOrDefault(a => a.AttributeClass?.Name == "JSObjectAttribute");
+        if (objectAttribute is null)
+        {
+            return new ObjectResult(null, ImmutableArray<Diagnostic>.Empty);
+        }
+        var isReadOnly = true; // Default value
+        foreach (var arg in objectAttribute.NamedArguments)
+        {
+            if (arg is { Key: "ReadOnly", Value.Value: bool readOnlyValue })
+            {
+                isReadOnly = readOnlyValue;
+                break;
+            }
+        }
+        
         var parameters = FindRecordParameters(typeSymbol, diagnostics);
 
         if (diagnostics.Count > 0)
             return new ObjectResult(null, diagnostics.ToImmutable());
 
         var documentation = ExtractXmlDocumentation(typeSymbol);
-        var typeScriptDefinition = GenerateObjectTypeScriptDefinition(typeSymbol.Name, parameters, documentation);
+        var typeScriptDefinition = GenerateObjectTypeScriptDefinition(typeSymbol.Name, parameters, documentation, isReadOnly);
 
         var model = new ObjectModel
         {
@@ -457,7 +585,8 @@ public partial class JSBindingGenerator : IIncrementalGenerator
                 : typeSymbol.ContainingNamespace.ToDisplayString(),
             Parameters = parameters,
             TypeScriptDefinition = typeScriptDefinition,
-            Documentation = documentation
+            Documentation = documentation,
+            ReadOnly = isReadOnly
         };
 
         return new ObjectResult(model, diagnostics.ToImmutable());
@@ -492,7 +621,22 @@ public partial class JSBindingGenerator : IIncrementalGenerator
 
         var properties = ExtractMarshalableProperties(symbol);
         var documentation = ExtractXmlDocumentation(symbol);
-        var typeScriptDefinition = GenerateMarshalableTypeScriptDefinition(symbol.Name, properties, documentation);
+        var objectAttribute = symbol.GetAttributes()
+            .FirstOrDefault(a => a.AttributeClass?.Name == "JSObjectAttribute");
+        var isReadOnly = false;
+        if (objectAttribute != null)
+        {
+            foreach (var arg in objectAttribute.NamedArguments)
+            {
+                if (arg is { Key: "ReadOnly", Value.Value: bool readOnlyValue })
+                {
+                    isReadOnly = readOnlyValue;
+                    break;
+                }
+            }
+        }
+        var typeScriptDefinition = GenerateMarshalableTypeScriptDefinition(symbol.Name, properties, documentation, isReadOnly);
+        
 
         var model = new MarshalableModel
         {
@@ -505,7 +649,8 @@ public partial class JSBindingGenerator : IIncrementalGenerator
             Documentation = documentation,
             IsNested = isNested,
             ParentClassName = parentClassName,
-            TypeKind = typeKind
+            TypeKind = typeKind,
+            ReadOnly = isReadOnly
         };
 
         return new MarshalableResult(model, diagnostics.ToImmutable());
@@ -681,7 +826,7 @@ public partial class JSBindingGenerator : IIncrementalGenerator
 
         return methods;
     }
-    
+
     private static string GetJsEnumName(INamedTypeSymbol enumSymbol)
     {
         var jsEnumAttr = enumSymbol.GetAttributes()
@@ -695,81 +840,81 @@ public partial class JSBindingGenerator : IIncrementalGenerator
         return enumSymbol.Name;
     }
 
-   private static List<ModuleEnumReference> FindModuleEnumReferences(INamedTypeSymbol classSymbol,
-    ImmutableArray<Diagnostic>.Builder diagnostics)
-{
-    var references = new List<ModuleEnumReference>();
-    var location = classSymbol.Locations.FirstOrDefault() ?? Location.None;
-
-    foreach (var attr in classSymbol.GetAttributes())
+    private static List<ModuleEnumReference> FindModuleEnumReferences(INamedTypeSymbol classSymbol,
+        ImmutableArray<Diagnostic>.Builder diagnostics)
     {
-        if (attr.AttributeClass?.Name != "JSModuleEnumAttribute")
-            continue;
+        var references = new List<ModuleEnumReference>();
+        var location = classSymbol.Locations.FirstOrDefault() ?? Location.None;
 
-        INamedTypeSymbol? enumType = null;
-        string? exportName = null;
-
-        foreach (var arg in attr.NamedArguments)
-            if (arg is { Key: "EnumType", Value.Value: INamedTypeSymbol type })
-                enumType = type;
-            else if (arg is { Key: "ExportName", Value.Value: string name })
-                exportName = name;
-
-        if (enumType == null)
-            continue;
-
-        if (enumType.TypeKind != TypeKind.Enum)
+        foreach (var attr in classSymbol.GetAttributes())
         {
-            diagnostics.Add(Diagnostic.Create(InvalidModuleEnumError, location,
-                enumType.ToDisplayString()));
-            continue;
-        }
-
-        if (!HasAttribute(enumType, "HakoJS.SourceGeneration.JSEnumAttribute"))
-        {
-            diagnostics.Add(Diagnostic.Create(InvalidModuleEnumError, location,
-                enumType.ToDisplayString()));
-            continue;
-        }
-        
-        var jsEnumName = GetJsEnumName(enumType);
-        exportName ??= jsEnumName;
-
-        var isFlags = enumType.GetAttributes()
-            .Any(a => a.AttributeClass?.ToDisplayString() == "System.FlagsAttribute");
-
-        var values = new List<EnumValueModel>();
-        foreach (var member in enumType.GetMembers().OfType<IFieldSymbol>())
-        {
-            if (member.IsImplicitlyDeclared || !member.HasConstantValue)
+            if (attr.AttributeClass?.Name != "JSModuleEnumAttribute")
                 continue;
 
-            values.Add(new EnumValueModel
+            INamedTypeSymbol? enumType = null;
+            string? exportName = null;
+
+            foreach (var arg in attr.NamedArguments)
+                if (arg is { Key: "EnumType", Value.Value: INamedTypeSymbol type })
+                    enumType = type;
+                else if (arg is { Key: "ExportName", Value.Value: string name })
+                    exportName = name;
+
+            if (enumType == null)
+                continue;
+
+            if (enumType.TypeKind != TypeKind.Enum)
             {
-                Name = member.Name,
-                JsName = member.Name,
-                Value = member.ConstantValue ?? 0,
-                Documentation = ExtractXmlDocumentation(member)
+                diagnostics.Add(Diagnostic.Create(InvalidModuleEnumError, location,
+                    enumType.ToDisplayString()));
+                continue;
+            }
+
+            if (!HasAttribute(enumType, "HakoJS.SourceGeneration.JSEnumAttribute"))
+            {
+                diagnostics.Add(Diagnostic.Create(InvalidModuleEnumError, location,
+                    enumType.ToDisplayString()));
+                continue;
+            }
+
+            var jsEnumName = GetJsEnumName(enumType);
+            exportName ??= jsEnumName;
+
+            var isFlags = enumType.GetAttributes()
+                .Any(a => a.AttributeClass?.ToDisplayString() == "System.FlagsAttribute");
+
+            var values = new List<EnumValueModel>();
+            foreach (var member in enumType.GetMembers().OfType<IFieldSymbol>())
+            {
+                if (member.IsImplicitlyDeclared || !member.HasConstantValue)
+                    continue;
+
+                values.Add(new EnumValueModel
+                {
+                    Name = member.Name,
+                    JsName = member.Name,
+                    Value = member.ConstantValue ?? 0,
+                    Documentation = ExtractXmlDocumentation(member)
+                });
+            }
+
+            var documentation = ExtractXmlDocumentation(enumType);
+            var enumTypeScriptDef = GenerateEnumTypeScriptDefinition(jsEnumName, values, isFlags, documentation);
+
+            references.Add(new ModuleEnumReference
+            {
+                FullTypeName = enumType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+                SimpleName = enumType.Name,
+                ExportName = exportName,
+                TypeScriptDefinition = enumTypeScriptDef,
+                Documentation = documentation,
+                Values = values,
+                IsFlags = isFlags
             });
         }
 
-        var documentation = ExtractXmlDocumentation(enumType);
-        var enumTypeScriptDef = GenerateEnumTypeScriptDefinition(jsEnumName, values, isFlags, documentation);
-
-        references.Add(new ModuleEnumReference
-        {
-            FullTypeName = enumType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
-            SimpleName = enumType.Name,
-            ExportName = exportName,
-            TypeScriptDefinition = enumTypeScriptDef,
-            Documentation = documentation,
-            Values = values,
-            IsFlags = isFlags
-        });
+        return references;
     }
-
-    return references;
-}
 
     private static List<ModuleValueModel> FindModuleValues(INamedTypeSymbol classSymbol, string moduleName,
         ImmutableArray<Diagnostic>.Builder diagnostics)
@@ -965,56 +1110,75 @@ public partial class JSBindingGenerator : IIncrementalGenerator
     }
 
     private static List<ModuleInterfaceReference> FindModuleInterfaceReferences(INamedTypeSymbol classSymbol,
-        ImmutableArray<Diagnostic>.Builder diagnostics)
+    ImmutableArray<Diagnostic>.Builder diagnostics)
+{
+    var references = new List<ModuleInterfaceReference>();
+    var location = classSymbol.Locations.FirstOrDefault() ?? Location.None;
+
+    foreach (var attr in classSymbol.GetAttributes())
     {
-        var references = new List<ModuleInterfaceReference>();
-        var location = classSymbol.Locations.FirstOrDefault() ?? Location.None;
+        if (attr.AttributeClass?.Name != "JSModuleInterfaceAttribute")
+            continue;
 
-        foreach (var attr in classSymbol.GetAttributes())
+        INamedTypeSymbol? interfaceType = null;
+        string? exportName = null;
+
+        foreach (var arg in attr.NamedArguments)
+            if (arg is { Key: "InterfaceType", Value.Value: INamedTypeSymbol type })
+                interfaceType = type;
+            else if (arg is { Key: "ExportName", Value.Value: string name })
+                exportName = name;
+
+        if (interfaceType == null)
+            continue;
+
+        if (!HasAttribute(interfaceType, "HakoJS.SourceGeneration.JSObjectAttribute"))
         {
-            if (attr.AttributeClass?.Name != "JSModuleInterfaceAttribute")
-                continue;
-
-            INamedTypeSymbol? interfaceType = null;
-            string? exportName = null;
-
-            foreach (var arg in attr.NamedArguments)
-                if (arg is { Key: "InterfaceType", Value.Value: INamedTypeSymbol type })
-                    interfaceType = type;
-                else if (arg is { Key: "ExportName", Value.Value: string name })
-                    exportName = name;
-
-            if (interfaceType == null)
-                continue;
-
-            if (!HasAttribute(interfaceType, "HakoJS.SourceGeneration.JSObjectAttribute"))
-            {
-                diagnostics.Add(Diagnostic.Create(InvalidModuleInterfaceError, location,
-                    interfaceType.ToDisplayString()));
-                continue;
-            }
-
-            exportName ??= interfaceType.Name;
-
-            var parameters = FindRecordParameters(interfaceType, ImmutableArray.CreateBuilder<Diagnostic>());
-            var documentation = ExtractXmlDocumentation(interfaceType);
-
-            var interfaceTypeScriptDef = GenerateObjectTypeScriptDefinition(
-                interfaceType.Name, parameters, documentation);
-
-            references.Add(new ModuleInterfaceReference
-            {
-                FullTypeName = interfaceType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
-                SimpleName = interfaceType.Name,
-                ExportName = exportName,
-                TypeScriptDefinition = interfaceTypeScriptDef,
-                Documentation = documentation,
-                Parameters = parameters
-            });
+            diagnostics.Add(Diagnostic.Create(InvalidModuleInterfaceError, location,
+                interfaceType.ToDisplayString()));
+            continue;
         }
 
-        return references;
+        exportName ??= interfaceType.Name;
+        
+        var objectAttribute = interfaceType.GetAttributes()
+            .FirstOrDefault(a => a.AttributeClass?.Name == "JSObjectAttribute");
+        var isReadOnly = true;
+        if (objectAttribute != null)
+        {
+            foreach (var arg in objectAttribute.NamedArguments)
+            {
+                if (arg is { Key: "ReadOnly", Value.Value: bool readOnlyValue })
+                {
+                    isReadOnly = readOnlyValue;
+                    break;
+                }
+            }
+        }
+
+        var parameters = FindRecordParameters(interfaceType, ImmutableArray.CreateBuilder<Diagnostic>());
+        var documentation = ExtractXmlDocumentation(interfaceType);
+
+        var interfaceTypeScriptDef = GenerateObjectTypeScriptDefinition(
+            interfaceType.Name, 
+            parameters, 
+            documentation,
+            isReadOnly);
+
+        references.Add(new ModuleInterfaceReference
+        {
+            FullTypeName = interfaceType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+            SimpleName = interfaceType.Name,
+            ExportName = exportName,
+            TypeScriptDefinition = interfaceTypeScriptDef,
+            Documentation = documentation,
+            Parameters = parameters,
+            ReadOnly = isReadOnly
+        });
     }
+
+    return references;
+}
 
     private static List<RecordParameterModel> FindRecordParameters(INamedTypeSymbol typeSymbol,
         ImmutableArray<Diagnostic>.Builder diagnostics)
@@ -1171,62 +1335,116 @@ public partial class JSBindingGenerator : IIncrementalGenerator
         return classType.Name;
     }
 
+    private static bool IsNumericType(ITypeSymbol? type)
+    {
+        return type?.SpecialType is SpecialType.System_Int32 or
+            SpecialType.System_Int64 or
+            SpecialType.System_Int16 or
+            SpecialType.System_Byte or
+            SpecialType.System_SByte or
+            SpecialType.System_UInt32 or
+            SpecialType.System_UInt64 or
+            SpecialType.System_UInt16 or
+            SpecialType.System_Double or
+            SpecialType.System_Single or
+            SpecialType.System_Decimal;
+    }
+
     private static bool CanMarshalType(ITypeSymbol type)
-{
-    if (type.SpecialType == SpecialType.System_Void)
-        return true;
-
-    if (IsPrimitiveType(type))
-        return true;
-
-    if (type.IsNullableValueType() && type is INamedTypeSymbol { TypeArguments.Length: > 0 } namedType)
-        return CanMarshalType(namedType.TypeArguments[0]);
-
-    if (type is IArrayTypeSymbol { ElementType.SpecialType: SpecialType.System_Byte })
-        return true;
-
-    if (type is IArrayTypeSymbol arrayOfPrimitives && IsPrimitiveType(arrayOfPrimitives.ElementType))
-        return true;
-    
-    if (type is IArrayTypeSymbol arrayType)
     {
-        var elementType = arrayType.ElementType;
-        
-        // Check if element is [JSEnum]
-        if (elementType.TypeKind == TypeKind.Enum && elementType is INamedTypeSymbol enumSymbol)
+        if (type.SpecialType == SpecialType.System_Void)
+            return true;
+
+        if (type.SpecialType == SpecialType.System_Object)
+            return true;
+
+        if (IsPrimitiveType(type))
+            return true;
+
+        if (type.IsNullableValueType() && type is INamedTypeSymbol { TypeArguments.Length: > 0 } namedType)
+            return CanMarshalType(namedType.TypeArguments[0]);
+
+        if (type is IArrayTypeSymbol { ElementType.SpecialType: SpecialType.System_Byte })
+            return true;
+
+        if (type is IArrayTypeSymbol arrayOfPrimitives && IsPrimitiveType(arrayOfPrimitives.ElementType))
+            return true;
+
+        if (type is IArrayTypeSymbol arrayType)
         {
-            if (HasAttribute(enumSymbol, "HakoJS.SourceGeneration.JSEnumAttribute"))
+            var elementType = arrayType.ElementType;
+
+            // Check if element is [JSEnum]
+            if (elementType.TypeKind == TypeKind.Enum && elementType is INamedTypeSymbol enumSymbol)
+                if (HasAttribute(enumSymbol, "HakoJS.SourceGeneration.JSEnumAttribute"))
+                    return true;
+
+            if (HasAttribute(elementType, "HakoJS.SourceGeneration.JSObjectAttribute") ||
+                HasAttribute(elementType, "HakoJS.SourceGeneration.JSClassAttribute"))
                 return true;
+
+            return ImplementsIJSMarshalable(elementType) || ImplementsIJSBindable(elementType);
         }
-        
-        if (HasAttribute(elementType, "HakoJS.SourceGeneration.JSObjectAttribute") ||
-            HasAttribute(elementType, "HakoJS.SourceGeneration.JSClassAttribute"))
+
+        if (type is INamedTypeSymbol { IsGenericType: true } genericType)
         {
-            return true;
+            var typeDefinition = genericType.ConstructedFrom.ToDisplayString();
+
+            // Handle dictionaries
+            if (typeDefinition is "System.Collections.Generic.Dictionary<TKey, TValue>" or
+                "System.Collections.Generic.IDictionary<TKey, TValue>" or
+                "System.Collections.Generic.IReadOnlyDictionary<TKey, TValue>")
+            {
+                if (genericType.TypeArguments.Length >= 2)
+                {
+                    var keyType = genericType.TypeArguments[0];
+                    var valueType = genericType.TypeArguments[1];
+
+                    // Key must be string or numeric
+                    var isKeyValid = keyType.SpecialType == SpecialType.System_String || IsNumericType(keyType);
+                    if (!isKeyValid)
+                        return false;
+
+                    // Value can be any marshalable type
+                    return CanMarshalType(valueType);
+                }
+
+                return false;
+            }
+
+            // Handle generic collections
+            if (typeDefinition is "System.Collections.Generic.List<T>" or
+                "System.Collections.Generic.IList<T>" or
+                "System.Collections.Generic.ICollection<T>" or
+                "System.Collections.Generic.IEnumerable<T>" or
+                "System.Collections.Generic.IReadOnlyList<T>" or
+                "System.Collections.Generic.IReadOnlyCollection<T>")
+            {
+                if (genericType.TypeArguments.Length > 0)
+                    return CanMarshalType(genericType.TypeArguments[0]);
+                return false;
+            }
         }
-    }
 
-    if (IsTaskType(type))
-    {
-        var innerType = GetTaskInnerType(type);
-        return innerType == null || CanMarshalType(innerType);
-    }
+        if (IsTaskType(type))
+        {
+            var innerType = GetTaskInnerType(type);
+            return innerType == null || CanMarshalType(innerType);
+        }
 
-    if (IsDelegateType(type))
-        return true;
-    
-    if (type.TypeKind == TypeKind.Enum && type is INamedTypeSymbol enumSymbol2)
-    {
-        return HasAttribute(enumSymbol2, "HakoJS.SourceGeneration.JSEnumAttribute");
-    }
-
-    if (type is INamedTypeSymbol classType)
-        if (HasAttribute(classType, "HakoJS.SourceGeneration.JSClassAttribute") ||
-            HasAttribute(classType, "HakoJS.SourceGeneration.JSObjectAttribute"))
+        if (IsDelegateType(type))
             return true;
 
-    return ImplementsIJSMarshalable(type) || ImplementsIJSBindable(type);
-}
+        if (type.TypeKind == TypeKind.Enum && type is INamedTypeSymbol enumSymbol2)
+            return HasAttribute(enumSymbol2, "HakoJS.SourceGeneration.JSEnumAttribute");
+
+        if (type is INamedTypeSymbol classType)
+            if (HasAttribute(classType, "HakoJS.SourceGeneration.JSClassAttribute") ||
+                HasAttribute(classType, "HakoJS.SourceGeneration.JSObjectAttribute"))
+                return true;
+
+        return ImplementsIJSMarshalable(type) || ImplementsIJSBindable(type);
+    }
 
     private static bool IsPrimitiveType(ITypeSymbol type)
     {
@@ -1280,7 +1498,25 @@ public partial class JSBindingGenerator : IIncrementalGenerator
         if (type is INamedTypeSymbol { TypeArguments.Length: > 0 } namedType)
             return CreateTypeInfo(namedType.TypeArguments[0]);
 
-        return new TypeInfo("void", false, true, false, null, SpecialType.System_Void, null, false, false);
+        return new TypeInfo(
+            "void",
+            false,
+            true,
+            false,
+            null,
+            SpecialType.System_Void,
+            null,
+            false,
+            false, // isFlags
+            false, // isGenericDictionary
+            null, // keyType
+            null, // valueType
+            null, // keyTypeSymbol
+            null, // valueTypeSymbol
+            false, // isGenericCollection
+            null, // itemType
+            null // itemTypeSymbol
+        );
     }
 
     private static bool IsDelegateType(ITypeSymbol type)
@@ -1367,8 +1603,55 @@ public partial class JSBindingGenerator : IIncrementalGenerator
                     .Any(a => a.AttributeClass?.ToDisplayString() == "System.FlagsAttribute");
         }
 
-        return new TypeInfo(fullName, isNullable, isValueType, isArray, elementType, specialType, underlyingType,
-            isEnum, isFlags);
+        // Check if it's a generic dictionary
+        var isGenericDictionary = false;
+        string? keyType = null;
+        string? valueType = null;
+        ITypeSymbol? keyTypeSymbol = null;
+        ITypeSymbol? valueTypeSymbol = null;
+
+        if (type is INamedTypeSymbol { IsGenericType: true } genericType)
+        {
+            var typeDefinition = genericType.ConstructedFrom.ToDisplayString();
+            if (typeDefinition is "System.Collections.Generic.Dictionary<TKey, TValue>" or
+                "System.Collections.Generic.IDictionary<TKey, TValue>" or
+                "System.Collections.Generic.IReadOnlyDictionary<TKey, TValue>")
+                if (genericType.TypeArguments.Length >= 2)
+                {
+                    isGenericDictionary = true;
+                    keyTypeSymbol = genericType.TypeArguments[0];
+                    valueTypeSymbol = genericType.TypeArguments[1];
+                    keyType = keyTypeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+                    valueType = valueTypeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+                }
+        }
+
+        // Check if it's a generic collection
+        var isGenericCollection = false;
+        string? itemType = null;
+        ITypeSymbol? itemTypeSymbol = null;
+
+        if (type is INamedTypeSymbol { IsGenericType: true } collectionType && !isGenericDictionary)
+        {
+            var typeDefinition = collectionType.ConstructedFrom.ToDisplayString();
+            if (typeDefinition is "System.Collections.Generic.List<T>" or
+                "System.Collections.Generic.IList<T>" or
+                "System.Collections.Generic.ICollection<T>" or
+                "System.Collections.Generic.IEnumerable<T>" or
+                "System.Collections.Generic.IReadOnlyList<T>" or
+                "System.Collections.Generic.IReadOnlyCollection<T>")
+                if (collectionType.TypeArguments.Length > 0)
+                {
+                    isGenericCollection = true;
+                    itemTypeSymbol = collectionType.TypeArguments[0];
+                    itemType = itemTypeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+                }
+        }
+
+        return new TypeInfo(
+            fullName, isNullable, isValueType, isArray, elementType, specialType, underlyingType,
+            isEnum, isFlags, isGenericDictionary, keyType, valueType, keyTypeSymbol, valueTypeSymbol,
+            isGenericCollection, itemType, itemTypeSymbol);
     }
 
     private static string? FormatDefaultValue(IParameterSymbol param)
