@@ -329,6 +329,20 @@ public sealed class WacsInstance : WasmInstance
         };
     }
 
+    public override Func<int, long, int>? GetFunctionInt32WithLong<T1, T2>(string name)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        var funcAddr = GetFunctionAddress(name);
+        if (funcAddr == null) return null;
+
+        var invoker = _runtime.CreateStackInvoker(funcAddr.Value);
+        return (a1, a2) =>
+        {
+            var results = invoker([new Value(a1), new Value(a2)]);
+            return results[0];
+        };
+    }
+
     // ===== Actions =====
 
     public override Action? GetAction(string name)

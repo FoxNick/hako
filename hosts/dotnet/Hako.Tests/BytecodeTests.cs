@@ -112,7 +112,7 @@ public class BytecodeTests : TestBase
 
         Assert.True(result.IsSuccess);
         var bytecode = result.Unwrap();
-        Assert.Equal(0, bytecode.Length);
+        Assert.Empty(bytecode);
     }
 
     [Fact]

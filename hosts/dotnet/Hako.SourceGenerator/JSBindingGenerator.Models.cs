@@ -31,6 +31,13 @@ public partial class JSBindingGenerator
         public readonly MarshalableModel? Model = model;
         public readonly ImmutableArray<Diagnostic> Diagnostics = diagnostics;
     }
+    
+        
+    private readonly struct EnumResult(EnumModel? model, ImmutableArray<Diagnostic> diagnostics)
+    {
+        public readonly EnumModel? Model = model;
+        public readonly ImmutableArray<Diagnostic> Diagnostics = diagnostics;
+    }
 
     #endregion
 
@@ -57,6 +64,8 @@ public partial class JSBindingGenerator
         public List<ModuleValueModel> Values { get; set; } = new();
         public List<ModuleMethodModel> Methods { get; set; } = new();
         public List<ModuleClassReference> ClassReferences { get; set; } = new();
+        public List<ModuleInterfaceReference> InterfaceReferences { get; set; } = new();
+        public List<ModuleEnumReference> EnumReferences { get; set; } = new(); // ← ADD THIS
         public string TypeScriptDefinition { get; set; } = "";
         public string? Documentation { get; set; }
     }
@@ -154,6 +163,16 @@ public partial class JSBindingGenerator
         public List<MethodModel> Methods { get; set; } = new();
     }
 
+    private class ModuleInterfaceReference
+    {
+        public string FullTypeName { get; set; } = "";
+        public string SimpleName { get; set; } = "";
+        public string ExportName { get; set; } = "";
+        public string TypeScriptDefinition { get; set; } = "";
+        public string? Documentation { get; set; }
+        public List<RecordParameterModel> Parameters { get; set; } = new();
+    }
+
     private class ParameterModel
     {
         public string Name { get; set; } = "";
@@ -161,7 +180,7 @@ public partial class JSBindingGenerator
         public bool IsOptional { get; set; }
         public string? DefaultValue { get; set; }
         public string? Documentation { get; set; }
-        
+
         public bool IsDelegate { get; set; }
         public DelegateInfo? DelegateInfo { get; set; }
     }
@@ -193,7 +212,9 @@ public partial class JSBindingGenerator
         bool isArray,
         string? elementType,
         SpecialType specialType,
-        ITypeSymbol? underlyingType)
+        ITypeSymbol? underlyingType,
+        bool isEnum,
+        bool isFlags)
     {
         public readonly string FullName = fullName;
         public readonly bool IsNullable = isNullable;
@@ -202,6 +223,8 @@ public partial class JSBindingGenerator
         public readonly string? ElementType = elementType;
         public readonly SpecialType SpecialType = specialType;
         public readonly ITypeSymbol? UnderlyingType = underlyingType;
+        public readonly bool IsEnum = isEnum;
+        public readonly bool IsFlags = isFlags;
     }
 
     private class TypeDependency
@@ -211,5 +234,36 @@ public partial class JSBindingGenerator
         public bool IsFromModule { get; set; }
     }
 
+    private class EnumModel
+    {
+        public string EnumName { get; set; } = "";
+        public string SourceNamespace { get; set; } = "";
+        public string JsEnumName { get; set; } = "";
+        public List<EnumValueModel> Values { get; set; } = new();
+        public bool IsFlags { get; set; }
+        public string TypeScriptDefinition { get; set; } = "";
+        public string? Documentation { get; set; }
+        public Accessibility DeclaredAccessibility { get; set; } = Accessibility.Public;
+    }
+    
+    private class EnumValueModel
+    {
+        public string Name { get; set; } = "";
+        public string JsName { get; set; } = "";
+        public object Value { get; set; } = 0;
+        public string? Documentation { get; set; }
+    }
+
+    private class ModuleEnumReference
+    {
+        public string FullTypeName { get; set; } = "";
+        public string SimpleName { get; set; } = "";
+        public string ExportName { get; set; } = "";
+        public string TypeScriptDefinition { get; set; } = "";
+        public string? Documentation { get; set; }
+        public List<EnumValueModel> Values { get; set; } = new();
+        public bool IsFlags { get; set; }
+    }
+    
     #endregion
 }

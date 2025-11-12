@@ -210,10 +210,12 @@ handler.OnEvent("test"); // Calls JS function
 ## Generated Output
 
 The source generator produces:
+
 - **C# binding code**: Marshaling logic between .NET and JavaScript
 - **TypeScript definitions**: Accessible via `YourType.TypeDefinition` property with complete type information
 
-TypeScript definitions are automatically generated for all types with `[JSClass]`, `[JSObject]`, `[JSModule]`, or implementing `IJSMarshalable<T>`. XML documentation comments (`///`) are converted to JSDoc format in the definitions.
+TypeScript definitions are automatically generated for all types with `[JSClass]`, `[JSObject]`, `[JSModule]`, or
+implementing `IJSMarshalable<T>`. XML documentation comments (`///`) are converted to JSDoc format in the definitions.
 
 ## Supported Types
 
@@ -229,6 +231,7 @@ TypeScript definitions are automatically generated for all types with `[JSClass]
 ## Attributes
 
 ### Class Attributes
+
 - `[JSClass(Name)]`: Expose class as JavaScript class
 - `[JSConstructor]`: Mark constructor to expose (optional, uses default if not specified)
 - `[JSProperty(Name, Static, ReadOnly)]`: Expose property to JavaScript
@@ -236,12 +239,14 @@ TypeScript definitions are automatically generated for all types with `[JSClass]
 - `[JSIgnore]`: Exclude member from JavaScript binding
 
 ### Module Attributes
+
 - `[JSModule(Name)]`: Create JavaScript module from static class
 - `[JSModuleValue(Name)]`: Expose static field/property as module export
 - `[JSModuleMethod(Name)]`: Expose static method as module function
 - `[JSModuleClass(ClassType, ExportName)]`: Export a JSClass from a module
 
 ### Record Attributes
+
 - `[JSObject]`: Marshal record types to/from JavaScript objects
 - `[JSPropertyName(Name)]`: Customize JavaScript property name for record parameters
 
@@ -249,4 +254,5 @@ TypeScript definitions are automatically generated for all types with `[JSClass]
 
 XML documentation comments (`///`) are automatically converted to JSDoc format in the generated TypeScript definitions.
 
-See the [main Hako documentation](https://github.com/6over3/hako/tree/main/hosts/dotnet) for complete usage and API reference
+See the [main Hako documentation](https://github.com/6over3/hako/tree/main/hosts/dotnet) for complete usage and API
+reference

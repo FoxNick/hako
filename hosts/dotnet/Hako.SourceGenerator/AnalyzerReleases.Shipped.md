@@ -1,3 +1,13 @@
+## Release 1.0.6
+
+### New Rules
+
+Rule ID | Category | Severity | Notes
+--------|----------|----------|-------
+HAKO020 | HakoJS.SourceGenerator | Error | Invalid module interface reference
+HAKO021 | HakoJS.SourceGenerator | Error | Interface used in multiple modules
+HAKO022 | HakoJS.SourceGenerator | Error | Invalid module enum reference
+
 ## Release 1.0.0
 
 ### New Rules

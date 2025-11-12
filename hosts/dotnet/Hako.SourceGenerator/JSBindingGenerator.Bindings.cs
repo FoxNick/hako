@@ -20,10 +20,7 @@ public partial class JSBindingGenerator
         sb.AppendLine();
         sb.AppendLine("using HakoJS.SourceGeneration;");
         sb.AppendLine();
-        if (!string.IsNullOrEmpty(model.SourceNamespace))
-        {
-            sb.AppendLine($"namespace {model.SourceNamespace};");
-        }
+        if (!string.IsNullOrEmpty(model.SourceNamespace)) sb.AppendLine($"namespace {model.SourceNamespace};");
 
         sb.AppendLine();
         sb.AppendLine(
@@ -95,10 +92,7 @@ public partial class JSBindingGenerator
         sb.AppendLine("using HakoJS.Host;");
         sb.AppendLine("using HakoJS.Extensions;");
         sb.AppendLine();
-        if (!string.IsNullOrEmpty(model.SourceNamespace))
-        {
-            sb.AppendLine($"namespace {model.SourceNamespace};");
-        }
+        if (!string.IsNullOrEmpty(model.SourceNamespace)) sb.AppendLine($"namespace {model.SourceNamespace};");
 
         sb.AppendLine();
         sb.AppendLine(
@@ -506,10 +500,7 @@ public partial class JSBindingGenerator
         sb.AppendLine("using HakoJS.Extensions;");
         sb.AppendLine("using HakoJS.SourceGeneration;");
         sb.AppendLine();
-        if (!string.IsNullOrEmpty(model.SourceNamespace))
-        {
-            sb.AppendLine($"namespace {model.SourceNamespace};");
-        }
+        if (!string.IsNullOrEmpty(model.SourceNamespace)) sb.AppendLine($"namespace {model.SourceNamespace};");
 
         sb.AppendLine();
         sb.AppendLine(
@@ -554,17 +545,36 @@ public partial class JSBindingGenerator
             foreach (var className in sortedClasses)
             {
                 var classRef = model.ClassReferences.First(c => c.SimpleName == className);
-                sb.AppendLine($"            var {ToCamelCase(classRef.SimpleName)}Class = realm.CreatePrototype<{classRef.FullTypeName}>();");
+                sb.AppendLine(
+                    $"            var {ToCamelCase(classRef.SimpleName)}Class = realm.CreatePrototype<{classRef.FullTypeName}>();");
             }
 
-            if (model.Values.Any() || model.Methods.Any())
+            if (model.Values.Any() || model.Methods.Any() || model.EnumReferences.Any())
+                sb.AppendLine();
+        }
+
+        // Export enums as objects
+        foreach (var enumRef in model.EnumReferences)
+        {
+            sb.AppendLine($"            using var {ToCamelCase(enumRef.SimpleName)}Obj = realm.NewObject();");
+            foreach (var value in enumRef.Values)
+                if (enumRef.IsFlags)
+                    // Flags enum - number values
+                    sb.AppendLine(
+                        $"            {ToCamelCase(enumRef.SimpleName)}Obj.SetProperty(\"{value.JsName}\", realm.NewNumber({value.Value}));");
+                else
+                    // Regular enum - string values
+                    sb.AppendLine(
+                        $"            {ToCamelCase(enumRef.SimpleName)}Obj.SetProperty(\"{value.JsName}\", realm.NewString(\"{value.Name}\"));");
+
+            sb.AppendLine(
+                $"            init.SetExport(\"{enumRef.ExportName}\", {ToCamelCase(enumRef.SimpleName)}Obj);");
+            if (enumRef != model.EnumReferences.Last() || model.Values.Any() || model.Methods.Any())
                 sb.AppendLine();
         }
 
         foreach (var value in model.Values)
-        {
             sb.AppendLine($"            init.SetExport(\"{value.JsName}\", {model.ClassName}.{value.Name});");
-        }
 
         if (model.Values.Any() && model.Methods.Any())
             sb.AppendLine();
@@ -576,7 +586,7 @@ public partial class JSBindingGenerator
                 sb.AppendLine();
         }
 
-        if ((model.Values.Any() || model.Methods.Any()) && sortedClasses.Any())
+        if ((model.Values.Any() || model.Methods.Any() || model.EnumReferences.Any()) && sortedClasses.Any())
             sb.AppendLine();
 
         foreach (var className in sortedClasses)
@@ -591,6 +601,8 @@ public partial class JSBindingGenerator
         allExports.AddRange(model.Values.Select(v => v.JsName));
         allExports.AddRange(model.Methods.Select(m => m.JsName));
         allExports.AddRange(model.ClassReferences.Select(c => c.ExportName));
+        allExports.AddRange(model.InterfaceReferences.Select(i => i.ExportName));
+        allExports.AddRange(model.EnumReferences.Select(e => e.ExportName));
 
         sb.AppendLine(allExports.Any()
             ? $"            .AddExports({string.Join(", ", allExports.Select(e => $"\"{e}\""))});"
@@ -612,57 +624,40 @@ public partial class JSBindingGenerator
         var classNames = classReferences.Select(c => c.SimpleName).ToImmutableHashSet();
         var dependencies = new Dictionary<string, HashSet<string>>();
 
-        foreach (var classRef in classReferences)
-        {
-            dependencies[classRef.SimpleName] = new HashSet<string>();
-        }
+        foreach (var classRef in classReferences) dependencies[classRef.SimpleName] = new HashSet<string>();
 
         foreach (var classRef in classReferences)
         {
             var deps = ExtractTypeDependencies(classRef, classNames);
             foreach (var dep in deps)
-            {
                 if (dep != classRef.SimpleName)
                     dependencies[classRef.SimpleName].Add(dep);
-            }
         }
 
         foreach (var value in values)
         {
             var typeName = ExtractSimpleTypeName(value.TypeInfo.FullName);
             if (classNames.Contains(typeName))
-            {
                 foreach (var className in classNames)
-                {
                     if (className != typeName)
                         dependencies[className].Add(typeName);
-                }
-            }
         }
 
         foreach (var method in methods)
         {
             var returnTypeName = ExtractSimpleTypeName(method.ReturnType.FullName);
             if (classNames.Contains(returnTypeName))
-            {
                 foreach (var className in classNames)
-                {
                     if (className != returnTypeName)
                         dependencies[className].Add(returnTypeName);
-                }
-            }
 
             foreach (var param in method.Parameters)
             {
                 var paramTypeName = ExtractSimpleTypeName(param.TypeInfo.FullName);
                 if (classNames.Contains(paramTypeName))
-                {
                     foreach (var className in classNames)
-                    {
                         if (className != paramTypeName)
                             dependencies[className].Add(paramTypeName);
-                    }
-                }
             }
         }
 
@@ -671,15 +666,9 @@ public partial class JSBindingGenerator
         var recursionStack = new HashSet<string>();
 
         foreach (var className in classNames)
-        {
             if (!visited.Contains(className))
-            {
                 if (!TopologicalSortDFS(className, dependencies, visited, recursionStack, sorted))
-                {
                     return classReferences.Select(c => c.SimpleName).ToList();
-                }
-            }
-        }
 
         sorted.Reverse();
         return sorted;
@@ -696,9 +685,7 @@ public partial class JSBindingGenerator
         recursionStack.Add(node);
 
         if (dependencies.TryGetValue(node, out var deps))
-        {
             foreach (var dep in deps)
-            {
                 if (!visited.Contains(dep))
                 {
                     if (!TopologicalSortDFS(dep, dependencies, visited, recursionStack, sorted))
@@ -708,27 +695,24 @@ public partial class JSBindingGenerator
                 {
                     return false;
                 }
-            }
-        }
 
         recursionStack.Remove(node);
         sorted.Add(node);
         return true;
     }
 
-    private static HashSet<string> ExtractTypeDependencies(ModuleClassReference classRef, ImmutableHashSet<string> classNames)
+    private static HashSet<string> ExtractTypeDependencies(ModuleClassReference classRef,
+        ImmutableHashSet<string> classNames)
     {
         var dependencies = new HashSet<string>();
 
         if (classRef.Constructor != null)
-        {
             foreach (var param in classRef.Constructor.Parameters)
             {
                 var typeName = ExtractSimpleTypeName(param.TypeInfo.FullName);
                 if (classNames.Contains(typeName))
                     dependencies.Add(typeName);
             }
-        }
 
         foreach (var prop in classRef.Properties)
         {

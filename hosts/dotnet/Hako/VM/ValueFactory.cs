@@ -25,7 +25,9 @@ internal sealed class ValueFactory(Realm context) : IDisposable
         {
             IJSMarshalable marshalable => marshalable.ToJSValue(Context),
             bool b => CreateBoolean(b),
-            byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal
+            long => CreateBigInt(Convert.ToInt64(value)),
+            ulong  => CreateBigUInt(Convert.ToUInt64(value)),
+            byte or sbyte or short or ushort or int or uint or float or double or decimal
                 => CreateNumber(Convert.ToDouble(value)),
             string str => CreateString(str),
             DBNull => CreateNull(),
@@ -113,6 +115,31 @@ internal sealed class ValueFactory(Realm context) : IDisposable
         return new JSValue(Context,
             value ? Context.Runtime.Registry.GetTrue() : Context.Runtime.Registry.GetFalse(),
             ValueLifecycle.Borrowed);
+    }
+
+    private JSValue CreateBigInt(long value)
+    {
+        var big = Context.Runtime.Registry.NewBigInt(Context.Pointer,value);
+        var error = Context.GetLastError(big);
+        if (error != null)
+        {
+            Context.FreeValuePointer(big);
+            throw new HakoException("Error creating BigInt", error);
+        }
+        return new JSValue(Context, big);
+    }
+    
+    private JSValue CreateBigUInt(ulong value)
+    {
+
+        var big = Context.Runtime.Registry.NewBigUInt(Context.Pointer, value);
+        var error = Context.GetLastError(big);
+        if (error != null)
+        {
+            Context.FreeValuePointer(big);
+            throw new HakoException("Error creating BigUInt", error);
+        }
+        return new JSValue(Context, big);
     }
 
     private JSValue CreateNumber(double value)

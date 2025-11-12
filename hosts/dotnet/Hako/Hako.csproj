@@ -8,6 +8,7 @@
         <LangVersion>preview</LangVersion>
         <IsAotCompatible>true</IsAotCompatible>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <EmbedUntrackedSources>false</EmbedUntrackedSources>
     </PropertyGroup>
 
     <PropertyGroup>
@@ -35,6 +36,7 @@
         <PackageReadmeFile>README.md</PackageReadmeFile>
         <EnablePackageValidation>true</EnablePackageValidation>
         <ContinuousIntegrationBuild Condition="'$(DevBuild)'=='false'">true</ContinuousIntegrationBuild>
+        <NoWarn>$(NoWarn);1591</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>

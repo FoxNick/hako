@@ -143,6 +143,12 @@ public sealed class WasmtimeInstance : WasmInstance
         ObjectDisposedException.ThrowIf(_disposed, this);
         return _instance.GetFunction<int, double, int>(name);
     }
+    
+    public override Func<int, long, int>? GetFunctionInt32WithLong<T1, T2>(string name)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        return _instance.GetFunction<int, long, int>(name);
+    }
 
     public override Action? GetAction(string name)
     {

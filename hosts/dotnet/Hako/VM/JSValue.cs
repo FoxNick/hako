@@ -119,7 +119,7 @@ public sealed class JSValue(Realm realm, int handle, ValueLifecycle lifecycle = 
         return Realm.Pointer;
     }
 
-    
+
     #region Conversion to Native
 
     /// <summary>
@@ -132,13 +132,13 @@ public sealed class JSValue(Realm realm, int handle, ValueLifecycle lifecycle = 
         AssertAlive();
         return TValue.FromJSValue(realm, this);
     }
-    
-    private static bool TryGetMarshalableConverter<T>(out Func<Realm, JSValue, T>? converter) 
+
+    private static bool TryGetMarshalableConverter<T>(out Func<Realm, JSValue, T>? converter)
         where T : IJSMarshalable<T>
     {
         converter = T.FromJSValue;
         return true;
-    } 
+    }
 
     /// <summary>
     /// Converts the JavaScript value to a .NET value of the specified type.
@@ -186,7 +186,7 @@ public sealed class JSValue(Realm realm, int handle, ValueLifecycle lifecycle = 
         AssertAlive();
         var type = Type;
         var disposables = new List<IDisposable> { this };
-        
+
         NativeBox<T> CreateResult(object value)
         {
             var alive = true;
@@ -214,7 +214,7 @@ public sealed class JSValue(Realm realm, int handle, ValueLifecycle lifecycle = 
                 JSType.Boolean => CreateResult(AsBoolean()),
                 JSType.Number => CreateResult(ConvertNumber()),
                 JSType.String => CreateResult(AsString()),
-                JSType.BigInt => CreateResult(GetBigInt()),
+                JSType.BigInt => CreateResult(AsInt64()),
                 JSType.Object => ConvertObject(),
                 JSType.Function => CreateResult(CreateStandaloneFunction()),
                 _ => throw new InvalidOperationException("Unknown type")
@@ -223,7 +223,7 @@ public sealed class JSValue(Realm realm, int handle, ValueLifecycle lifecycle = 
             object ConvertNumber()
             {
                 var numValue = AsNumber();
-                
+
                 if (typeof(T) == typeof(int))
                     return (int)numValue;
                 if (typeof(T) == typeof(long))
@@ -271,7 +271,7 @@ public sealed class JSValue(Realm realm, int handle, ValueLifecycle lifecycle = 
 
                 return result;
             }
-           
+
             Dictionary<string, string> ConvertToStringDictionary()
             {
                 var dict = new Dictionary<string, string>();
@@ -410,7 +410,7 @@ public sealed class JSValue(Realm realm, int handle, ValueLifecycle lifecycle = 
         AssertAlive();
         return Realm.Runtime.Registry.IsDate(_handle) is 1;
     }
-    
+
     /// <summary>
     /// Checks if the value is <c>Map</c>.
     /// </summary>
@@ -421,7 +421,7 @@ public sealed class JSValue(Realm realm, int handle, ValueLifecycle lifecycle = 
         AssertAlive();
         return Realm.Runtime.Registry.IsMap(_handle) is 1;
     }
-    
+
     /// <summary>
     /// Checks if the value is <c>Set</c>.
     /// </summary>
@@ -471,6 +471,15 @@ public sealed class JSValue(Realm realm, int handle, ValueLifecycle lifecycle = 
     public bool IsNumber()
     {
         return Type == JSType.Number;
+    }
+
+    /// <summary>
+    /// Checks if the value is a BigInt.
+    /// </summary>
+    /// <returns><c>true</c> if the value is a BigInt; otherwise, <c>false</c>.</returns>
+    public bool IsBigInt()
+    {
+        return Type == JSType.BigInt;
     }
 
     /// <summary>
@@ -596,8 +605,7 @@ public sealed class JSValue(Realm realm, int handle, ValueLifecycle lifecycle = 
     #endregion
 
     #region Type Conversion
-    
-    
+
     /// <summary>
     /// Converts a JavaScript Date object to a .NET DateTime.
     /// </summary>
@@ -629,14 +637,14 @@ public sealed class JSValue(Realm realm, int handle, ValueLifecycle lifecycle = 
     public DateTime AsDateTime()
     {
         AssertAlive();
-        if (!IsDate()) 
+        if (!IsDate())
             throw new InvalidOperationException("Value is not a Date");
-    
+
         var milliseconds = Realm.Runtime.Registry.GetDateTimestamp(Realm.Pointer, _handle);
-    
+
         if (double.IsNaN(milliseconds))
             throw new InvalidOperationException("Date has invalid timestamp (NaN)");
-    
+
         return DateTimeOffset.FromUnixTimeMilliseconds((long)milliseconds).UtcDateTime;
     }
 
@@ -730,29 +738,77 @@ public sealed class JSValue(Realm realm, int handle, ValueLifecycle lifecycle = 
     }
 
     /// <summary>
-    /// Gets the BigInt value as a 64-bit integer.
+    /// Converts the JavaScript value to a 64-bit signed integer.
     /// </summary>
-    /// <returns>The BigInt value as a <c>long</c>.</returns>
-    /// <exception cref="HakoException">
-    /// BigInt support is not enabled in this build of QuickJS.
-    /// </exception>
-    /// <exception cref="InvalidOperationException">The value is not a BigInt.</exception>
+    /// <returns>The value as a <c>long</c>.</returns>
+    /// <exception cref="HakoException">Conversion failed.</exception>
     /// <exception cref="HakoUseAfterFreeException">The value has been disposed.</exception>
     /// <remarks>
     /// <para>
-    /// BigInt support requires QuickJS to be compiled with BigNum support.
-    /// Check <c>runtime.Utils.GetBuildInfo().HasBignum</c> to verify availability.
+    /// This method handles conversion from various JavaScript types:
+    /// <list type="bullet">
+    /// <item><b>BigInt</b> → Direct conversion using HAKO_GetBigInt</item>
+    /// <item><b>number</b> → Converted to double then cast to long</item>
+    /// <item><b>string</b> → Parsed as number then cast to long</item>
+    /// <item><b>boolean</b> → <c>true</c> = 1, <c>false</c> = 0</item>
+    /// <item>Other types → Converted via ToNumber semantics</item>
+    /// </list>
     /// </para>
     /// <para>
-    /// This method only supports BigInt values that fit in a 64-bit signed integer.
-    /// Larger values will cause parsing to fail.
+    /// For BigInt values, this provides direct conversion without string parsing.
+    /// For number values, fractional parts are truncated.
     /// </para>
     /// </remarks>
-    public long GetBigInt()
+    public long AsInt64()
     {
         AssertAlive();
-        if (Type != JSType.BigInt) throw new InvalidOperationException("Value is not a BigInt");
-        return long.Parse(AsString());
+
+        if (IsBigInt())
+        {
+            var result = Realm.Runtime.Registry.GetBigInt(Realm.Pointer, _handle);
+            var error = Realm.GetLastError();
+            if (error != null) throw new HakoException("Failed to convert to int64", error);
+            return result;
+        }
+
+        return (long)AsNumber();
+    }
+
+    /// <summary>
+    /// Converts the JavaScript value to a 64-bit unsigned integer.
+    /// </summary>
+    /// <returns>The value as a <c>ulong</c>.</returns>
+    /// <exception cref="HakoException">Conversion failed.</exception>
+    /// <exception cref="HakoUseAfterFreeException">The value has been disposed.</exception>
+    /// <remarks>
+    /// <para>
+    /// This method handles conversion from various JavaScript types:
+    /// <list type="bullet">
+    /// <item><b>BigInt</b> → Direct conversion using HAKO_GetBigUInt</item>
+    /// <item><b>number</b> → Converted to double then cast to ulong</item>
+    /// <item><b>string</b> → Parsed as number then cast to ulong</item>
+    /// <item><b>boolean</b> → <c>true</c> = 1, <c>false</c> = 0</item>
+    /// <item>Other types → Converted via ToNumber semantics</item>
+    /// </list>
+    /// </para>
+    /// <para>
+    /// For BigInt values, this provides direct conversion without string parsing.
+    /// For number values, negative numbers wrap around according to two's complement.
+    /// </para>
+    /// </remarks>
+    public ulong AsUInt64()
+    {
+        AssertAlive();
+
+        if (IsBigInt())
+        {
+            var result = Realm.Runtime.Registry.GetBigUInt(Realm.Pointer, _handle);
+            var error = Realm.GetLastError();
+            if (error != null) throw new HakoException("Failed to convert to uint64", error);
+            return result;
+        }
+
+        return (ulong)AsNumber();
     }
 
     #endregion

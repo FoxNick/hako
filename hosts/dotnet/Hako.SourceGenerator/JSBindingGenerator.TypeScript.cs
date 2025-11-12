@@ -183,12 +183,55 @@ public partial class JSBindingGenerator
 
         return sb.ToString();
     }
+    
+    private static string EscapeTsString(string s)
+    {
+        return s.Replace("\\", "\\\\").Replace("\"", "\\\"");
+    }
+
+    private static string GenerateEnumTypeScriptDefinition(
+        string enumName,
+        List<EnumValueModel> values,
+        bool isFlags,
+        string? documentation = null)
+    {
+        var sb = new StringBuilder();
+
+        if (!string.IsNullOrWhiteSpace(documentation))
+            sb.Append(FormatTsDoc(documentation, indent: 0));
+
+        // export const <Name>: { readonly ... };
+        sb.AppendLine($"export const {enumName}: {{");
+
+        foreach (var value in values)
+        {
+            if (!string.IsNullOrWhiteSpace(value.Documentation))
+                sb.Append(FormatTsDoc(value.Documentation, indent: 2));
+
+            // In ambient context we only declare the *type* of the const's properties.
+            // Flags -> numeric literal; otherwise -> string literal of the name.
+            var typeLiteral = isFlags
+                ? value.Value.ToString()
+                : $"\"{EscapeTsString(value.Name)}\"";
+
+            sb.AppendLine($"  readonly {value.JsName}: {typeLiteral};");
+        }
+
+        sb.AppendLine("};");
+
+        // Also export a union type from the declared const shape
+        sb.AppendLine($"export type {enumName} = typeof {enumName}[keyof typeof {enumName}];");
+
+        return sb.ToString();
+    }
 
     private static string GenerateModuleTypeScriptDefinition(
         string moduleName,
         List<ModuleValueModel> values,
         List<ModuleMethodModel> methods,
         List<ModuleClassReference> classReferences,
+        List<ModuleInterfaceReference> interfaceReferences,
+        List<ModuleEnumReference> enumReferences,
         string? moduleDocumentation = null)
     {
         var sb = new StringBuilder();
@@ -210,6 +253,12 @@ public partial class JSBindingGenerator
         foreach (var classRef in classReferences)
             dependencies.Remove(classRef.SimpleName);
 
+        foreach (var interfaceRef in interfaceReferences)
+            dependencies.Remove(interfaceRef.SimpleName);
+
+        foreach (var enumRef in enumReferences)
+            dependencies.Remove(enumRef.SimpleName);
+
         var imports = GenerateImportStatements(dependencies, moduleName);
         if (!string.IsNullOrEmpty(imports))
             sb.Append(imports);
@@ -219,6 +268,32 @@ public partial class JSBindingGenerator
 
         sb.AppendLine($"declare module '{moduleName}' {{");
 
+        // Export enums first
+        foreach (var enumRef in enumReferences)
+        {
+            var lines = enumRef.TypeScriptDefinition.Split('\n');
+            foreach (var line in lines)
+            {
+                if (string.IsNullOrWhiteSpace(line))
+                    continue;
+
+                var trimmedLine = line.TrimEnd();
+
+                if (trimmedLine.StartsWith("export const ") || trimmedLine.StartsWith("export type "))
+                    sb.AppendLine("  " + trimmedLine);
+                else if (trimmedLine.StartsWith("/**") || trimmedLine.StartsWith(" *") ||
+                         trimmedLine.StartsWith(" */"))
+                    sb.AppendLine("  " + trimmedLine);
+                else
+                    sb.AppendLine("  " + trimmedLine);
+            }
+
+            if (enumRef != enumReferences.Last() || classReferences.Any() || interfaceReferences.Any() ||
+                values.Any() || methods.Any())
+                sb.AppendLine();
+        }
+
+        // Export classes
         foreach (var classRef in classReferences)
         {
             var lines = classRef.TypeScriptDefinition.Split('\n');
@@ -252,10 +327,50 @@ public partial class JSBindingGenerator
                 }
             }
 
-            if (classRef != classReferences.Last() || values.Any() || methods.Any())
+            if (classRef != classReferences.Last() || interfaceReferences.Any() || values.Any() || methods.Any())
                 sb.AppendLine();
         }
 
+        // Export interfaces
+        foreach (var interfaceRef in interfaceReferences)
+        {
+            var lines = interfaceRef.TypeScriptDefinition.Split('\n');
+            foreach (var line in lines)
+            {
+                if (string.IsNullOrWhiteSpace(line))
+                    continue;
+
+                var trimmedLine = line.TrimEnd();
+
+                if (trimmedLine.StartsWith("import "))
+                    continue;
+
+                if (trimmedLine.StartsWith("interface "))
+                {
+                    var interfaceName = interfaceRef.ExportName;
+                    trimmedLine = $"  export interface {interfaceName} {{";
+                    sb.AppendLine(trimmedLine);
+                }
+                else if (trimmedLine == "}")
+                {
+                    sb.AppendLine("  }");
+                }
+                else if (trimmedLine.StartsWith("/**") || trimmedLine.StartsWith(" *") ||
+                         trimmedLine.StartsWith(" */"))
+                {
+                    sb.AppendLine("  " + trimmedLine);
+                }
+                else
+                {
+                    sb.AppendLine("  " + trimmedLine);
+                }
+            }
+
+            if (interfaceRef != interfaceReferences.Last() || values.Any() || methods.Any())
+                sb.AppendLine();
+        }
+
+        // Export values
         foreach (var value in values)
         {
             var valueDoc = FormatTsDoc(value.Documentation);
@@ -269,6 +384,7 @@ public partial class JSBindingGenerator
         if (values.Any() && methods.Any())
             sb.AppendLine();
 
+        // Export methods
         foreach (var method in methods)
         {
             var methodDoc = FormatTsDoc(method.Documentation, method.ParameterDocs, method.ReturnDoc);
@@ -406,6 +522,16 @@ public partial class JSBindingGenerator
                 return "ArrayBuffer";
         }
 
+        if (type.IsEnum)
+        {
+            var enumName = ExtractSimpleTypeName(type.FullName);
+
+            if (type.UnderlyingType != null || (type.IsNullable && !type.IsValueType))
+                return $"{enumName} | null";
+
+            return enumName;
+        }
+
         if (type.UnderlyingType != null)
         {
             var underlyingTs = MapPrimitiveTypeToTypeScript(CreateTypeInfo(type.UnderlyingType));
@@ -511,7 +637,6 @@ public partial class JSBindingGenerator
         var dependencies = new HashSet<string>();
 
         foreach (var param in parameters)
-        {
             // Skip delegates - they're inlined in TypeScript
             if (param.IsDelegate)
             {
@@ -529,7 +654,6 @@ public partial class JSBindingGenerator
             {
                 AddTypeDependency(dependencies, param.TypeInfo);
             }
-        }
 
         if (returnType != null && returnType.Value.SpecialType != SpecialType.System_Void)
             AddTypeDependency(dependencies, returnType.Value);
@@ -542,7 +666,6 @@ public partial class JSBindingGenerator
             foreach (var method in methods)
             {
                 foreach (var param in method.Parameters)
-                {
                     // Skip delegates - they're inlined in TypeScript
                     if (param.IsDelegate)
                     {
@@ -560,7 +683,6 @@ public partial class JSBindingGenerator
                     {
                         AddTypeDependency(dependencies, param.TypeInfo);
                     }
-                }
 
                 if (method.ReturnType.SpecialType != SpecialType.System_Void)
                     AddTypeDependency(dependencies, method.ReturnType);
@@ -568,7 +690,6 @@ public partial class JSBindingGenerator
 
         if (recordParameters != null)
             foreach (var param in recordParameters)
-            {
                 // Skip delegates - they're inlined in TypeScript
                 if (param.IsDelegate)
                 {
@@ -586,7 +707,6 @@ public partial class JSBindingGenerator
                 {
                     AddTypeDependency(dependencies, param.TypeInfo);
                 }
-            }
 
         return dependencies;
     }
@@ -601,6 +721,13 @@ public partial class JSBindingGenerator
 
         if (IsSpecialMarshalingType(typeInfo.FullName))
             return;
+
+        if (typeInfo.IsEnum)
+        {
+            var simpleName = ExtractSimpleTypeName(typeInfo.FullName);
+            dependencies.Add(simpleName);
+            return;
+        }
 
         if (typeInfo is { IsArray: true, ElementType: not null })
         {
