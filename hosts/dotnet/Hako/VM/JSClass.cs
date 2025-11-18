@@ -172,7 +172,7 @@ public class JSClass : IDisposable
     /// <value>
     /// An integer class ID used internally by QuickJS to identify instances of this class.
     /// </value>
-    public int Id { get; }
+    public JSClassID Id { get; }
 
     /// <summary>
     /// Gets the name of the JavaScript class.
@@ -516,6 +516,7 @@ public class JSClass : IDisposable
         if (lastError != null) throw new HakoException("Unable to get opaque", lastError);
         return opaque;
     }
+    
 
     /// <summary>
     /// Checks if a JavaScript value is an instance of this class.

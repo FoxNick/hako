@@ -8,17 +8,17 @@ using HakoJS.VM;
 using System;
 
 var runtime = Hako.Initialize<WasmtimeEngine>();
+runtime.RegisterObjectConverters();
 var realm = runtime.CreateRealm().WithGlobals(g => g.WithConsole());
+
 
 realm.RegisterClass<Logger>();
 runtime.ConfigureModules().WithModule<FileSystemModule>().Apply();
 
 // Example 1
-var logResult = await realm.EvalAsync("const log = new Logger(); log");
-var logger = logResult.ToInstance<Logger>() ?? throw new Exception("Logger not found");
+var logger = await realm.EvalAsync<Logger>("const log = new Logger(); log");
 logger.Level = LogLevel.Warning;
 await realm.EvalAsync("console.log('JS level:', log.level);");
-logResult.Dispose();
 
 // Example 2
 var modResult = await realm.EvalAsync(@"

@@ -1,11 +1,26 @@
 using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 
 namespace HakoJS.SourceGenerator;
 
 public partial class JSBindingGenerator
 {
+    #region Identifier Helpers
+
+    /// <summary>
+    ///     Escapes an identifier if it's a C# reserved keyword
+    /// </summary>
+    private static string EscapeIdentifierIfNeeded(string identifier)
+    {
+        if (string.IsNullOrEmpty(identifier))
+            return identifier;
+        return SyntaxFacts.IsReservedKeyword(SyntaxFacts.GetKeywordKind(identifier)) ? $"@{identifier}" : identifier;
+    }
+
+    #endregion
+
     #region Object Binding Generation
 
     private static string GenerateObjectBinding(ObjectModel model)
@@ -28,8 +43,11 @@ public partial class JSBindingGenerator
         var hasDelegates = model.Parameters.Any(p => p.IsDelegate);
         var implementsDisposable = hasDelegates ? ", global::System.IDisposable" : "";
 
+        // Add abstract modifier if needed
+        var abstractModifier = model.IsAbstract() ? "abstract " : "";
+
         sb.AppendLine(
-            $"partial record {model.TypeName} : global::HakoJS.SourceGeneration.IJSMarshalable<{model.TypeName}>, global::HakoJS.SourceGeneration.IDefinitelyTyped<{model.TypeName}>{implementsDisposable}");
+            $"{abstractModifier}partial record {model.TypeName} : global::HakoJS.SourceGeneration.IJSMarshalable<{model.TypeName}>, global::HakoJS.SourceGeneration.IDefinitelyTyped<{model.TypeName}>{implementsDisposable}");
         sb.AppendLine("{");
 
         if (hasDelegates)
@@ -51,7 +69,10 @@ public partial class JSBindingGenerator
         }
 
         sb.AppendLine();
-        sb.AppendLine("    public static string TypeDefinition");
+
+        // TypeDefinition also needs 'new' modifier if it has a JSObject base
+        var newModifier = model.HasJSObjectBase() ? "new " : "";
+        sb.AppendLine($"    public static {newModifier}string TypeDefinition");
         sb.AppendLine("    {");
         sb.AppendLine("        get");
         sb.AppendLine("        {");
@@ -69,35 +90,125 @@ public partial class JSBindingGenerator
 
     private static bool NeedsIntermediateDisposal(TypeInfo typeInfo)
     {
-        // Collections and arrays always need disposal
         if (typeInfo.IsArray || typeInfo.IsGenericCollection || typeInfo.IsGenericDictionary)
             return true;
-
-        // Primitives and strings don't create new JSValues that need disposal
+        
         return typeInfo.SpecialType switch
         {
-            SpecialType.System_Boolean or SpecialType.System_Char or
-                SpecialType.System_SByte or SpecialType.System_Byte or
-                SpecialType.System_Int16 or SpecialType.System_UInt16 or
-                SpecialType.System_Int32 or SpecialType.System_UInt32 or
-                SpecialType.System_Int64 or SpecialType.System_UInt64 or
-                SpecialType.System_Single or SpecialType.System_Double or
-                SpecialType.System_DateTime or
-                SpecialType.System_String => false,
-            _ => true // Custom types, enums, etc. need disposal
+            SpecialType.System_Boolean => false,
+            _ => true
         };
+    }
+
+    private static void GenerateObjectMethod(StringBuilder sb, ObjectModel model, MethodModel method, string indent)
+    {
+        var funcType = method.IsAsync ? "NewFunctionAsync" : "NewFunction";
+        var asyncPrefix = method.IsAsync ? "async " : "";
+
+        sb.AppendLine(
+            $"{indent}using var {ToCamelCase(method.Name)}Func = realm.{funcType}(\"{method.JsName}\", {asyncPrefix}(ctx, thisArg, args) =>");
+        sb.AppendLine($"{indent}{{");
+
+        var requiredParams = method.Parameters.Count(p => !p.IsOptional);
+        if (requiredParams > 0)
+        {
+            sb.AppendLine($"{indent}    if (args.Length < {requiredParams})");
+            sb.AppendLine(
+                $"{indent}        return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"{method.JsName}() requires at least {requiredParams} argument(s)\");");
+            sb.AppendLine();
+        }
+
+        sb.AppendLine($"{indent}    try");
+        sb.AppendLine($"{indent}    {{");
+
+        for (var i = 0; i < method.Parameters.Count; i++)
+        {
+            var param = method.Parameters[i];
+            var argName = $"args[{i}]";
+            var varName = param.Name;
+
+            if (param.IsOptional)
+            {
+                sb.AppendLine(
+                    $"{indent}        var {varName} = args.Length > {i} ? {GetUnmarshalWithDefault(param.TypeInfo, argName, param.DefaultValue)} : {param.DefaultValue ?? GetDefaultValueForType(param.TypeInfo)};");
+            }
+            else
+            {
+                sb.AppendLine($"{indent}        if ({argName}.IsNullOrUndefined())");
+                sb.AppendLine(
+                    $"{indent}            return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Parameter '{varName}' cannot be null or undefined\");");
+                sb.AppendLine($"{indent}        if (!{GetTypeCheck(param.TypeInfo, argName)})");
+                sb.AppendLine(
+                    $"{indent}            return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Parameter '{varName}' must be {GetTypeName(param.TypeInfo)}\");");
+                sb.AppendLine($"{indent}        var {varName} = {GetStrictUnmarshalCode(param.TypeInfo, argName)};");
+            }
+        }
+
+        var callArgs = string.Join(", ", method.Parameters.Select(p => p.Name));
+
+        if (method.IsAsync)
+        {
+            if (!method.IsVoid)
+            {
+                sb.AppendLine($"{indent}        var result = await {method.Name}({callArgs});");
+                sb.AppendLine($"{indent}        return {GetMarshalCode(method.ReturnType, "result", "ctx")};");
+            }
+            else
+            {
+                sb.AppendLine($"{indent}        await {method.Name}({callArgs});");
+                sb.AppendLine($"{indent}        return ctx.Undefined();");
+            }
+        }
+        else
+        {
+            if (!method.IsVoid)
+            {
+                sb.AppendLine($"{indent}        var result = {method.Name}({callArgs});");
+                sb.AppendLine($"{indent}        return {GetMarshalCode(method.ReturnType, "result", "ctx")};");
+            }
+            else
+            {
+                sb.AppendLine($"{indent}        {method.Name}({callArgs});");
+                sb.AppendLine($"{indent}        return ctx.Undefined();");
+            }
+        }
+
+        sb.AppendLine($"{indent}    }}");
+        sb.AppendLine($"{indent}    catch (global::System.Exception ex)");
+        sb.AppendLine($"{indent}    {{");
+        sb.AppendLine($"{indent}        return ctx.ThrowError(ex);");
+        sb.AppendLine($"{indent}    }}");
+        sb.AppendLine($"{indent}}});");
+        sb.AppendLine($"{indent}obj.SetProperty(\"{method.JsName}\", {ToCamelCase(method.Name)}Func);");
     }
 
     private static void GenerateObjectToJSValue(StringBuilder sb, ObjectModel model)
     {
-        sb.AppendLine("    public global::HakoJS.VM.JSValue ToJSValue(global::HakoJS.VM.Realm realm)");
+        string methodSignature;
+        if (model.IsAbstract())
+        {
+            methodSignature = "public abstract global::HakoJS.VM.JSValue ToJSValue(global::HakoJS.VM.Realm realm);";
+            sb.AppendLine($"    {methodSignature}");
+            return;
+        }
+
+        if (model.HasJSObjectBase())
+            methodSignature = "public override global::HakoJS.VM.JSValue ToJSValue(global::HakoJS.VM.Realm realm)";
+        else
+            methodSignature = "public global::HakoJS.VM.JSValue ToJSValue(global::HakoJS.VM.Realm realm)";
+
+        sb.AppendLine($"    {methodSignature}");
         sb.AppendLine("    {");
         sb.AppendLine("        var obj = realm.NewObject();");
         sb.AppendLine("        try");
         sb.AppendLine("        {");
 
+        sb.AppendLine($"            using var typeIdValue = realm.NewNumber({model.GetTypeId()});");
+        sb.AppendLine(
+            "            obj.SetPropertyWithDescriptor(\"_hako_id\", typeIdValue, writable: false, enumerable: false, configurable: false);");
+        sb.AppendLine();
+
         foreach (var param in model.Parameters)
-        {
             if (param.IsDelegate && param.DelegateInfo != null)
             {
                 GenerateDelegateToFunction(sb, param, "            ");
@@ -106,7 +217,6 @@ public partial class JSBindingGenerator
             {
                 var marshalCode = GetMarshalCode(param.TypeInfo, param.Name, "realm");
 
-                // Check if marshaling creates a new JSValue that needs disposal
                 if (NeedsIntermediateDisposal(param.TypeInfo))
                 {
                     var tempVarName = $"{param.Name}Value";
@@ -114,10 +224,10 @@ public partial class JSBindingGenerator
                     if (param.TypeInfo is { IsNullable: true, IsValueType: false })
                     {
                         sb.AppendLine($"            if ({param.Name} != null)");
-                        sb.AppendLine($"            {{");
+                        sb.AppendLine("            {");
                         sb.AppendLine($"                using var {tempVarName} = {marshalCode};");
                         sb.AppendLine($"                obj.SetProperty(\"{param.JsName}\", {tempVarName});");
-                        sb.AppendLine($"            }}");
+                        sb.AppendLine("            }");
                     }
                     else
                     {
@@ -127,7 +237,6 @@ public partial class JSBindingGenerator
                 }
                 else
                 {
-                    // Primitives don't need intermediate disposal
                     if (param.TypeInfo is { IsNullable: true, IsValueType: false })
                     {
                         sb.AppendLine($"            if ({param.Name} != null)");
@@ -139,13 +248,27 @@ public partial class JSBindingGenerator
                     }
                 }
             }
+
+        foreach (var prop in model.Properties)
+        {
+            var propValue = prop.IsStatic ? $"{model.TypeName}.{prop.Name}" : prop.Name;
+            var marshalCode = GetMarshalCode(prop.TypeInfo, propValue, "realm");
+
+            if (NeedsIntermediateDisposal(prop.TypeInfo))
+            {
+                var tempVarName = $"{prop.Name}PropValue";
+                sb.AppendLine($"            using var {tempVarName} = {marshalCode};");
+                sb.AppendLine($"            obj.SetProperty(\"{prop.JsName}\", {tempVarName});");
+            }
+            else
+            {
+                sb.AppendLine($"            obj.SetProperty(\"{prop.JsName}\", {marshalCode});");
+            }
         }
 
-        // Freeze the object if ReadOnly is true
-        if (model.ReadOnly)
-        {
-            sb.AppendLine("            obj.Freeze(realm);");
-        }
+        foreach (var method in model.Methods) GenerateObjectMethod(sb, model, method, "            ");
+
+        if (model.ReadOnly) sb.AppendLine("            obj.Freeze(realm);");
 
         sb.AppendLine("            return obj;");
         sb.AppendLine("        }");
@@ -156,6 +279,7 @@ public partial class JSBindingGenerator
         sb.AppendLine("        }");
         sb.AppendLine("    }");
     }
+
 
     private static void GenerateDelegateToFunction(StringBuilder sb, RecordParameterModel param, string indent)
     {
@@ -256,12 +380,34 @@ public partial class JSBindingGenerator
 
     private static void GenerateObjectFromJSValue(StringBuilder sb, ObjectModel model)
     {
+        var newModifier = model.HasJSObjectBase() ? "new " : "";
+
         sb.AppendLine(
-            $"    public static {model.TypeName} FromJSValue(global::HakoJS.VM.Realm realm, global::HakoJS.VM.JSValue jsValue)");
+            $"    public static {newModifier}{model.TypeName} FromJSValue(global::HakoJS.VM.Realm realm, global::HakoJS.VM.JSValue jsValue)");
         sb.AppendLine("    {");
+
         sb.AppendLine("        if (!jsValue.IsObject())");
         sb.AppendLine("            throw new global::System.InvalidOperationException(\"JSValue must be an object\");");
         sb.AppendLine();
+
+        if (model.IsAbstract())
+        {
+            sb.AppendLine("        if (jsValue.TryReify(out var reified))");
+            sb.AppendLine("        {");
+            sb.AppendLine($"            if (reified is {model.TypeName} typedInstance)");
+            sb.AppendLine("                return typedInstance;");
+            sb.AppendLine();
+            sb.AppendLine(
+                $"            throw new global::System.InvalidOperationException(\"Reified instance is not assignable to {model.TypeName}\");");
+            sb.AppendLine("        }");
+            sb.AppendLine();
+            sb.AppendLine("        throw new global::System.NotSupportedException(");
+            sb.AppendLine($"            \"Cannot instantiate abstract type '{model.TypeName}'. \" +");
+            sb.AppendLine(
+                "            \"The JavaScript object should have a _hako_id indicating a concrete derived type.\");");
+            sb.AppendLine("    }");
+            return;
+        }
 
         var delegateParams = model.Parameters.Where(p => p.IsDelegate).ToList();
         if (delegateParams.Any())
@@ -272,7 +418,7 @@ public partial class JSBindingGenerator
             sb.AppendLine();
         }
 
-        foreach (var param in model.Parameters)
+        foreach (var param in model.ConstructorParameters)
         {
             if (param.IsDelegate && param.DelegateInfo != null)
                 GenerateFunctionToDelegate(sb, param, "        ");
@@ -282,7 +428,8 @@ public partial class JSBindingGenerator
             sb.AppendLine();
         }
 
-        var constructorArgs = string.Join(", ", model.Parameters.Select(p => ToCamelCase(p.Name)));
+        var constructorArgs = string.Join(", ",
+            model.ConstructorParameters.Select(p => EscapeIdentifierIfNeeded(ToCamelCase(p.Name))));
         sb.AppendLine($"        var instance = new {model.TypeName}({constructorArgs});");
 
         if (delegateParams.Any())
@@ -303,7 +450,7 @@ public partial class JSBindingGenerator
         var delegateInfo = param.DelegateInfo!;
         var isRequired = !param.IsOptional;
         var propVarName = ToCamelCase(param.Name) + "Prop";
-        var localVarName = ToCamelCase(param.Name);
+        var localVarName = EscapeIdentifierIfNeeded(ToCamelCase(param.Name));
 
         sb.AppendLine($"{indent}using var {propVarName} = jsValue.GetProperty(\"{param.JsName}\");");
 
@@ -322,7 +469,12 @@ public partial class JSBindingGenerator
         }
         else
         {
-            sb.AppendLine($"{indent}{param.TypeInfo.FullName} {localVarName};");
+            // Add nullable marker for optional reference types
+            var typeDeclaration = param.TypeInfo.FullName;
+            if (!param.TypeInfo.IsValueType && !typeDeclaration.EndsWith("?"))
+                typeDeclaration += "?";
+
+            sb.AppendLine($"{indent}{typeDeclaration} {localVarName};");
             sb.AppendLine($"{indent}if ({propVarName}.IsNullOrUndefined())");
             sb.AppendLine($"{indent}{{");
             sb.AppendLine($"{indent}    {localVarName} = {param.DefaultValue ?? "null"};");
@@ -345,6 +497,15 @@ public partial class JSBindingGenerator
         var delegateInfo = param.DelegateInfo!;
         var indent = new string(' ', prefix.Length);
 
+        // Build parameter list with proper nullability
+        var delegateParams = string.Join(", ", delegateInfo.Parameters.Select(p =>
+        {
+            var typeName = p.TypeInfo.FullName;
+            if (!p.TypeInfo.IsValueType && p.TypeInfo.IsNullable && !typeName.EndsWith("?"))
+                typeName += "?";
+            return $"{typeName} {p.Name}";
+        }));
+
         var paramTypes = string.Join(", ", delegateInfo.Parameters.Select(p => p.TypeInfo.FullName));
 
         string delegateType;
@@ -365,35 +526,33 @@ public partial class JSBindingGenerator
                 : $"global::System.Func<{returnTypeStr}>";
         }
 
-        var delegateParams = string.Join(", ", delegateInfo.Parameters.Select(p => $"{p.TypeInfo.FullName} {p.Name}"));
-
         if (delegateInfo.IsAsync)
         {
             sb.Append($"{prefix}new {delegateType}(async ({delegateParams}) =>");
             sb.AppendLine();
             sb.AppendLine($"{indent}{{");
 
-            foreach (var p in delegateInfo.Parameters)
-                sb.AppendLine($"{indent}    using var {p.Name}Js = realm.NewValue({p.Name});");
-
-            var jsArgs = string.Join(", ", delegateInfo.Parameters.Select(p => $"{p.Name}Js"));
-            if (jsArgs.Length > 0)
-                sb.AppendLine(
-                    $"{indent}    using var result = realm.CallFunction(captured{ToPascalCase(param.Name)}!, null, {jsArgs}).Unwrap();");
-            else
-                sb.AppendLine(
-                    $"{indent}    using var result = realm.CallFunction(captured{ToPascalCase(param.Name)}!, null).Unwrap();");
-
-            sb.AppendLine();
+            var invokeArgs = delegateInfo.Parameters.Any()
+                ? string.Join(", ", delegateInfo.Parameters.Select(p => p.Name))
+                : "";
 
             if (!delegateInfo.IsVoid)
             {
-                sb.AppendLine($"{indent}    using var awaited = await result.Await();");
-                sb.AppendLine($"{indent}    return {GetUnmarshalCode(delegateInfo.ReturnType, "awaited")};");
+                if (invokeArgs.Length > 0)
+                    sb.AppendLine(
+                        $"{indent}    using var result = await captured{ToPascalCase(param.Name)}!.InvokeAsync({invokeArgs});");
+                else
+                    sb.AppendLine(
+                        $"{indent}    using var result = await captured{ToPascalCase(param.Name)}!.InvokeAsync();");
+
+                sb.AppendLine($"{indent}    return {GetUnmarshalCode(delegateInfo.ReturnType, "result")};");
             }
             else
             {
-                sb.AppendLine($"{indent}    await result.Await();");
+                if (invokeArgs.Length > 0)
+                    sb.AppendLine($"{indent}    await captured{ToPascalCase(param.Name)}!.InvokeAsync({invokeArgs});");
+                else
+                    sb.AppendLine($"{indent}    await captured{ToPascalCase(param.Name)}!.InvokeAsync();");
             }
 
             sb.Append($"{indent}}})");
@@ -405,19 +564,27 @@ public partial class JSBindingGenerator
             sb.AppendLine();
             sb.AppendLine($"{indent}{{");
 
-            foreach (var p in delegateInfo.Parameters)
-                sb.AppendLine($"{indent}    using var {p.Name}Js = realm.NewValue({p.Name});");
-
-            var jsArgs = string.Join(", ", delegateInfo.Parameters.Select(p => $"{p.Name}Js"));
-            if (jsArgs.Length > 0)
-                sb.AppendLine(
-                    $"{indent}    using var result = realm.CallFunction(captured{ToPascalCase(param.Name)}!, null, {jsArgs}).Unwrap();");
-            else
-                sb.AppendLine(
-                    $"{indent}    using var result = realm.CallFunction(captured{ToPascalCase(param.Name)}!, null).Unwrap();");
+            var invokeArgs = delegateInfo.Parameters.Any()
+                ? string.Join(", ", delegateInfo.Parameters.Select(p => p.Name))
+                : "";
 
             if (!delegateInfo.IsVoid)
+            {
+                if (invokeArgs.Length > 0)
+                    sb.AppendLine(
+                        $"{indent}    using var result = captured{ToPascalCase(param.Name)}!.Invoke({invokeArgs});");
+                else
+                    sb.AppendLine($"{indent}    using var result = captured{ToPascalCase(param.Name)}!.Invoke();");
+
                 sb.AppendLine($"{indent}    return {GetUnmarshalCode(delegateInfo.ReturnType, "result")};");
+            }
+            else
+            {
+                if (invokeArgs.Length > 0)
+                    sb.AppendLine($"{indent}    captured{ToPascalCase(param.Name)}!.Invoke({invokeArgs});");
+                else
+                    sb.AppendLine($"{indent}    captured{ToPascalCase(param.Name)}!.Invoke();");
+            }
 
             sb.Append($"{indent}}})");
             sb.AppendLine(suffix);
@@ -428,7 +595,7 @@ public partial class JSBindingGenerator
     {
         var isRequired = !param.IsOptional;
         var propVarName = ToCamelCase(param.Name) + "Prop";
-        var localVarName = ToCamelCase(param.Name);
+        var localVarName = EscapeIdentifierIfNeeded(ToCamelCase(param.Name));
 
         sb.AppendLine($"{indent}using var {propVarName} = jsValue.GetProperty(\"{param.JsName}\");");
 
@@ -497,7 +664,52 @@ public partial class JSBindingGenerator
         var argName = $"args[{index}]";
         var isRequired = !param.IsOptional;
         var type = param.TypeInfo;
+        var paramName = EscapeIdentifierIfNeeded(param.Name);
 
+        // Handle delegates specially
+        if (param.IsDelegate && param.DelegateInfo != null)
+        {
+            var typeDeclaration = type.FullName;
+            if (!type.IsValueType && !isRequired && !typeDeclaration.EndsWith("?"))
+                typeDeclaration += "?";
+
+            if (isRequired)
+            {
+                sb.AppendLine($"{indent}if ({argName}.IsNullOrUndefined())");
+                sb.AppendLine(
+                    $"{indent}    return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Parameter '{param.Name}' cannot be null or undefined\");");
+                sb.AppendLine($"{indent}if (!{argName}.IsFunction())");
+                sb.AppendLine(
+                    $"{indent}    return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Parameter '{param.Name}' must be a function\");");
+                sb.AppendLine();
+
+                // Generate delegate wrapper inline
+                GenerateDelegateParameterWrapper(sb, param, argName, paramName, indent, false);
+            }
+            else
+            {
+                sb.AppendLine($"{indent}{typeDeclaration} {paramName};");
+                sb.AppendLine($"{indent}if (args.Length > {index} && !{argName}.IsNullOrUndefined())");
+                sb.AppendLine($"{indent}{{");
+                sb.AppendLine($"{indent}    if (!{argName}.IsFunction())");
+                sb.AppendLine(
+                    $"{indent}        return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Parameter '{param.Name}' must be a function\");");
+                sb.AppendLine();
+
+                // Generate delegate wrapper inline
+                GenerateDelegateParameterWrapper(sb, param, argName, paramName, indent + "    ", true);
+
+                sb.AppendLine($"{indent}}}");
+                sb.AppendLine($"{indent}else");
+                sb.AppendLine($"{indent}{{");
+                sb.AppendLine($"{indent}    {paramName} = {param.DefaultValue ?? "null"};");
+                sb.AppendLine($"{indent}}}");
+            }
+
+            return;
+        }
+
+        // Handle nullable value types (e.g., int?)
         if (type.UnderlyingType != null)
         {
             var underlyingTypeInfo = CreateTypeInfo(type.UnderlyingType);
@@ -509,12 +721,12 @@ public partial class JSBindingGenerator
                 sb.AppendLine(
                     $"{indent}    return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Parameter '{param.Name}' must be {GetTypeName(underlyingTypeInfo)}\");");
                 sb.AppendLine(
-                    $"{indent}var {param.Name} = arg{index}IsNull ? null : ({type.FullName})({GetStrictUnmarshalCode(underlyingTypeInfo, argName)});");
+                    $"{indent}var {paramName} = arg{index}IsNull ? null : ({type.FullName})({GetStrictUnmarshalCode(underlyingTypeInfo, argName)});");
             }
             else
             {
                 var defaultExpr = param.DefaultValue ?? "null";
-                sb.AppendLine($"{indent}{type.FullName} {param.Name};");
+                sb.AppendLine($"{indent}{type.FullName} {paramName};");
                 sb.AppendLine($"{indent}if (args.Length > {index})");
                 sb.AppendLine($"{indent}{{");
                 sb.AppendLine($"{indent}    var arg{index}IsNull = {argName}.IsNullOrUndefined();");
@@ -522,11 +734,11 @@ public partial class JSBindingGenerator
                 sb.AppendLine(
                     $"{indent}        return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Parameter '{param.Name}' must be {GetTypeName(underlyingTypeInfo)}\");");
                 sb.AppendLine(
-                    $"{indent}    {param.Name} = arg{index}IsNull ? null : ({type.FullName})({GetStrictUnmarshalCode(underlyingTypeInfo, argName)});");
+                    $"{indent}    {paramName} = arg{index}IsNull ? null : ({type.FullName})({GetStrictUnmarshalCode(underlyingTypeInfo, argName)});");
                 sb.AppendLine($"{indent}}}");
                 sb.AppendLine($"{indent}else");
                 sb.AppendLine($"{indent}{{");
-                sb.AppendLine($"{indent}    {param.Name} = {defaultExpr};");
+                sb.AppendLine($"{indent}    {paramName} = {defaultExpr};");
                 sb.AppendLine($"{indent}}}");
             }
         }
@@ -539,7 +751,7 @@ public partial class JSBindingGenerator
                 sb.AppendLine(
                     $"{indent}    return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Parameter '{param.Name}' must be {GetTypeName(type)}\");");
                 sb.AppendLine(
-                    $"{indent}var {param.Name} = arg{index}IsNull ? null : {GetStrictUnmarshalCode(type, argName)};");
+                    $"{indent}var {paramName} = arg{index}IsNull ? null : {GetStrictUnmarshalCode(type, argName)};");
             }
             else
             {
@@ -549,16 +761,21 @@ public partial class JSBindingGenerator
                 sb.AppendLine($"{indent}if (!{GetTypeCheck(type, argName)})");
                 sb.AppendLine(
                     $"{indent}    return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Parameter '{param.Name}' must be {GetTypeName(type)}\");");
-                sb.AppendLine($"{indent}var {param.Name} = {GetStrictUnmarshalCode(type, argName)};");
+                sb.AppendLine($"{indent}var {paramName} = {GetStrictUnmarshalCode(type, argName)};");
             }
         }
         else
         {
             var defaultExpr = param.DefaultValue ?? GetDefaultValueForType(type);
 
+            // Add nullable marker for optional reference types
+            var typeDeclaration = type.FullName;
+            if (!type.IsValueType && !typeDeclaration.EndsWith("?"))
+                typeDeclaration += "?";
+
             if (type.IsNullable)
             {
-                sb.AppendLine($"{indent}{type.FullName} {param.Name};");
+                sb.AppendLine($"{indent}{typeDeclaration} {paramName};");
                 sb.AppendLine($"{indent}if (args.Length > {index})");
                 sb.AppendLine($"{indent}{{");
                 sb.AppendLine($"{indent}    var arg{index}IsNull = {argName}.IsNullOrUndefined();");
@@ -566,16 +783,16 @@ public partial class JSBindingGenerator
                 sb.AppendLine(
                     $"{indent}        return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Parameter '{param.Name}' must be {GetTypeName(type)}\");");
                 sb.AppendLine(
-                    $"{indent}    {param.Name} = arg{index}IsNull ? null : {GetStrictUnmarshalCode(type, argName)};");
+                    $"{indent}    {paramName} = arg{index}IsNull ? null : {GetStrictUnmarshalCode(type, argName)};");
                 sb.AppendLine($"{indent}}}");
                 sb.AppendLine($"{indent}else");
                 sb.AppendLine($"{indent}{{");
-                sb.AppendLine($"{indent}    {param.Name} = {defaultExpr};");
+                sb.AppendLine($"{indent}    {paramName} = {defaultExpr};");
                 sb.AppendLine($"{indent}}}");
             }
             else
             {
-                sb.AppendLine($"{indent}{type.FullName} {param.Name};");
+                sb.AppendLine($"{indent}{typeDeclaration} {paramName};");
                 sb.AppendLine($"{indent}if (args.Length > {index})");
                 sb.AppendLine($"{indent}{{");
                 sb.AppendLine($"{indent}    if ({argName}.IsNullOrUndefined())");
@@ -584,13 +801,90 @@ public partial class JSBindingGenerator
                 sb.AppendLine($"{indent}    if (!{GetTypeCheck(type, argName)})");
                 sb.AppendLine(
                     $"{indent}        return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Parameter '{param.Name}' must be {GetTypeName(type)}\");");
-                sb.AppendLine($"{indent}    {param.Name} = {GetStrictUnmarshalCode(type, argName)};");
+                sb.AppendLine($"{indent}    {paramName} = {GetStrictUnmarshalCode(type, argName)};");
                 sb.AppendLine($"{indent}}}");
                 sb.AppendLine($"{indent}else");
                 sb.AppendLine($"{indent}{{");
-                sb.AppendLine($"{indent}    {param.Name} = {defaultExpr};");
+                sb.AppendLine($"{indent}    {paramName} = {defaultExpr};");
                 sb.AppendLine($"{indent}}}");
             }
+        }
+    }
+
+    private static void GenerateDelegateParameterWrapper(StringBuilder sb, ParameterModel param, string jsValueName,
+        string paramName, string indent, bool isOptionalAssignment)
+    {
+        var delegateInfo = param.DelegateInfo!;
+
+        // Build parameter list with proper nullability
+        var delegateParams = string.Join(", ", delegateInfo.Parameters.Select(p =>
+        {
+            var typeName = p.TypeInfo.FullName;
+            // Add nullable marker for reference types if needed
+            if (!p.TypeInfo.IsValueType && p.TypeInfo.IsNullable && !typeName.EndsWith("?"))
+                typeName += "?";
+            return $"{typeName} {p.Name}";
+        }));
+
+        var assignmentPrefix = isOptionalAssignment ? $"{indent}{paramName} = " : $"{indent}var {paramName} = ";
+
+        if (delegateInfo.IsAsync)
+        {
+            sb.AppendLine($"{assignmentPrefix}async ({delegateParams}) =>");
+            sb.AppendLine($"{indent}{{");
+
+            // Build arguments array for Invoke
+            var invokeArgs = delegateInfo.Parameters.Any()
+                ? string.Join(", ", delegateInfo.Parameters.Select(p => p.Name))
+                : "";
+
+            if (!delegateInfo.IsVoid)
+            {
+                if (invokeArgs.Length > 0)
+                    sb.AppendLine($"{indent}    using var result = await {jsValueName}.InvokeAsync({invokeArgs});");
+                else
+                    sb.AppendLine($"{indent}    using var result = await {jsValueName}.InvokeAsync();");
+
+                sb.AppendLine($"{indent}    return {GetUnmarshalCode(delegateInfo.ReturnType, "result")};");
+            }
+            else
+            {
+                if (invokeArgs.Length > 0)
+                    sb.AppendLine($"{indent}    await {jsValueName}.InvokeAsync({invokeArgs});");
+                else
+                    sb.AppendLine($"{indent}    await {jsValueName}.InvokeAsync();");
+            }
+
+            sb.AppendLine($"{indent}}};");
+        }
+        else
+        {
+            sb.AppendLine($"{assignmentPrefix}({delegateParams}) =>");
+            sb.AppendLine($"{indent}{{");
+
+            // Build arguments array for Invoke
+            var invokeArgs = delegateInfo.Parameters.Any()
+                ? string.Join(", ", delegateInfo.Parameters.Select(p => p.Name))
+                : "";
+
+            if (!delegateInfo.IsVoid)
+            {
+                if (invokeArgs.Length > 0)
+                    sb.AppendLine($"{indent}    using var result = {jsValueName}.Invoke({invokeArgs});");
+                else
+                    sb.AppendLine($"{indent}    using var result = {jsValueName}.Invoke();");
+
+                sb.AppendLine($"{indent}    return {GetUnmarshalCode(delegateInfo.ReturnType, "result")};");
+            }
+            else
+            {
+                if (invokeArgs.Length > 0)
+                    sb.AppendLine($"{indent}    {jsValueName}.Invoke({invokeArgs});");
+                else
+                    sb.AppendLine($"{indent}    {jsValueName}.Invoke();");
+            }
+
+            sb.AppendLine($"{indent}}};");
         }
     }
 
@@ -633,12 +927,21 @@ public partial class JSBindingGenerator
 
     private static string GetTypeCheck(TypeInfo type, string jsValueName)
     {
+        // For nullable value types, check the underlying type
+        if (type.UnderlyingType != null)
+        {
+            var underlyingTypeInfo = CreateTypeInfo(type.UnderlyingType);
+            return GetTypeCheck(underlyingTypeInfo, jsValueName);
+        }
+
         switch (type.SpecialType)
         {
             case SpecialType.System_String:
                 return $"{jsValueName}.IsString()";
             case SpecialType.System_Boolean:
                 return $"{jsValueName}.IsBoolean()";
+            case SpecialType.System_Char:
+                return $"{jsValueName}.IsString()";
             case SpecialType.System_Int32:
             case SpecialType.System_Int64:
             case SpecialType.System_Int16:
@@ -671,6 +974,14 @@ public partial class JSBindingGenerator
 
     private static string GetStrictUnmarshalCode(TypeInfo type, string jsValueName, string contextVarName = "ctx")
     {
+        // Handle nullable value types by unmarshaling the underlying type and casting
+        if (type.UnderlyingType != null)
+        {
+            var underlyingTypeInfo = CreateTypeInfo(type.UnderlyingType);
+            var underlyingCode = GetStrictUnmarshalCode(underlyingTypeInfo, jsValueName, contextVarName);
+            return $"({type.FullName})({underlyingCode})";
+        }
+
         if (type.SpecialType is SpecialType.System_Object)
             return $"{jsValueName}.GetNativeValue<object>()";
 
@@ -709,19 +1020,16 @@ public partial class JSBindingGenerator
             // Check the specific collection type and convert appropriately
             var typeDefinition = type.FullName.Replace("global::", "");
             if (typeDefinition.StartsWith("System.Collections.Generic.List<"))
-            {
                 // For List<T>, wrap the array in a List constructor
                 return $"new {type.FullName}({arrayExpr})";
-            }
-            else if (typeDefinition.StartsWith("System.Collections.Generic.IList<") ||
-                     typeDefinition.StartsWith("System.Collections.Generic.ICollection<") ||
-                     typeDefinition.StartsWith("System.Collections.Generic.IEnumerable<") ||
-                     typeDefinition.StartsWith("System.Collections.Generic.IReadOnlyList<") ||
-                     typeDefinition.StartsWith("System.Collections.Generic.IReadOnlyCollection<"))
-            {
+
+            if (typeDefinition.StartsWith("System.Collections.Generic.IList<") ||
+                typeDefinition.StartsWith("System.Collections.Generic.ICollection<") ||
+                typeDefinition.StartsWith("System.Collections.Generic.IEnumerable<") ||
+                typeDefinition.StartsWith("System.Collections.Generic.IReadOnlyList<") ||
+                typeDefinition.StartsWith("System.Collections.Generic.IReadOnlyCollection<"))
                 // For interfaces, the array can be used directly (implicit conversion)
                 return arrayExpr;
-            }
 
             // Fallback for other collection types
             return arrayExpr;
@@ -731,6 +1039,8 @@ public partial class JSBindingGenerator
         {
             case SpecialType.System_String:
                 return $"{jsValueName}.AsString()";
+            case SpecialType.System_Char: 
+                return $"{jsValueName}.AsString().FirstOrDefault()";
             case SpecialType.System_Int32:
                 return $"(int){jsValueName}.AsNumber()";
             case SpecialType.System_Int64:
@@ -753,6 +1063,7 @@ public partial class JSBindingGenerator
                 return $"(ulong){jsValueName}.AsNumber()";
             case SpecialType.System_UInt16:
                 return $"(ushort){jsValueName}.AsNumber()";
+            
             case SpecialType.System_DateTime:
                 return $"{jsValueName}.AsDateTime()";
         }
@@ -770,7 +1081,11 @@ public partial class JSBindingGenerator
 
         if (type is { IsArray: true, ElementType: not null })
         {
-            if (IsPrimitiveTypeName(type.ElementType)) return $"{jsValueName}.ToArray<{type.ElementType}>()";
+            var elementTypeName = type.ElementType.Replace("global::", "");
+            
+            if (IsPrimitiveTypeName(type.ElementType) || 
+                elementTypeName is "System.Object" or "object")
+                return $"{jsValueName}.ToArray<{type.ElementType}>()";
 
             return $"{jsValueName}.ToArrayOf<{type.ElementType}>()";
         }
@@ -780,6 +1095,9 @@ public partial class JSBindingGenerator
 
     private static string GetUnmarshalCode(TypeInfo type, string jsValueName, string contextVarName = "realm")
     {
+        if (type.SpecialType == SpecialType.System_Object)
+            return $"{jsValueName}.GetNativeValue<object>()";
+
         switch (type.SpecialType)
         {
             case SpecialType.System_String:
@@ -830,10 +1148,19 @@ public partial class JSBindingGenerator
 
     private static string GetTypeName(TypeInfo type)
     {
+        // For nullable value types, get the name of the underlying type
+        if (type.UnderlyingType != null)
+        {
+            var underlyingTypeInfo = CreateTypeInfo(type.UnderlyingType);
+            return GetTypeName(underlyingTypeInfo);
+        }
+
         switch (type.SpecialType)
         {
             case SpecialType.System_String:
                 return "a string";
+            case SpecialType.System_Char:
+                return "a string (single character)";
             case SpecialType.System_Boolean:
                 return "a boolean";
             case SpecialType.System_Int32:
@@ -883,41 +1210,31 @@ public partial class JSBindingGenerator
 
         if (type.IsGenericDictionary && type.KeyTypeSymbol != null && type.ValueTypeSymbol != null)
         {
-            bool isKeyValid = type.KeyTypeSymbol.SpecialType == SpecialType.System_String ||
-                              IsNumericType(type.KeyTypeSymbol);
+            var isKeyValid = type.KeyTypeSymbol.SpecialType == SpecialType.System_String ||
+                             IsNumericType(type.KeyTypeSymbol);
 
             if (isKeyValid)
             {
-                bool isValueMarshalable = ImplementsIJSMarshalable(type.ValueTypeSymbol) ||
-                                          HasAttribute(type.ValueTypeSymbol,
-                                              "HakoJS.SourceGeneration.JSClassAttribute") ||
-                                          HasAttribute(type.ValueTypeSymbol,
-                                              "HakoJS.SourceGeneration.JSObjectAttribute");
+                var isValueMarshalable = ImplementsIJSMarshalable(type.ValueTypeSymbol) ||
+                                         HasAttribute(type.ValueTypeSymbol,
+                                             "HakoJS.SourceGeneration.JSClassAttribute") ||
+                                         HasAttribute(type.ValueTypeSymbol,
+                                             "HakoJS.SourceGeneration.JSObjectAttribute");
 
                 if (type.IsNullable && !type.IsValueType)
                 {
                     if (isValueMarshalable)
-                    {
                         return
                             $"({valueName} == null ? {ctxName}.Null() : {valueName}.ToJSDictionaryOf<{type.KeyType}, {type.ValueType}>({ctxName}))";
-                    }
-                    else
-                    {
-                        return
-                            $"({valueName} == null ? {ctxName}.Null() : {valueName}.ToJSDictionary<{type.KeyType}, {type.ValueType}>({ctxName}))";
-                    }
+
+                    return
+                        $"({valueName} == null ? {ctxName}.Null() : {valueName}.ToJSDictionary<{type.KeyType}, {type.ValueType}>({ctxName}))";
                 }
-                else
-                {
-                    if (isValueMarshalable)
-                    {
-                        return $"{valueName}.ToJSDictionaryOf<{type.KeyType}, {type.ValueType}>({ctxName})";
-                    }
-                    else
-                    {
-                        return $"{valueName}.ToJSDictionary<{type.KeyType}, {type.ValueType}>({ctxName})";
-                    }
-                }
+
+                if (isValueMarshalable)
+                    return $"{valueName}.ToJSDictionaryOf<{type.KeyType}, {type.ValueType}>({ctxName})";
+
+                return $"{valueName}.ToJSDictionary<{type.KeyType}, {type.ValueType}>({ctxName})";
             }
 
             return $"{ctxName}.NewValue({valueName})";
@@ -925,34 +1242,23 @@ public partial class JSBindingGenerator
 
         if (type.IsGenericCollection && type.ItemTypeSymbol != null)
         {
-            bool isItemMarshalable = ImplementsIJSMarshalable(type.ItemTypeSymbol) ||
-                                     HasAttribute(type.ItemTypeSymbol, "HakoJS.SourceGeneration.JSClassAttribute") ||
-                                     HasAttribute(type.ItemTypeSymbol, "HakoJS.SourceGeneration.JSObjectAttribute");
+            var isItemMarshalable = ImplementsIJSMarshalable(type.ItemTypeSymbol) ||
+                                    HasAttribute(type.ItemTypeSymbol, "HakoJS.SourceGeneration.JSClassAttribute") ||
+                                    HasAttribute(type.ItemTypeSymbol, "HakoJS.SourceGeneration.JSObjectAttribute");
 
             if (type.IsNullable && !type.IsValueType)
             {
                 if (isItemMarshalable)
-                {
                     return
                         $"({valueName} == null ? {ctxName}.Null() : {valueName}.ToJSArrayOf<{type.ItemType}>({ctxName}))";
-                }
-                else
-                {
-                    return
-                        $"({valueName} == null ? {ctxName}.Null() : {valueName}.ToJSArray<{type.ItemType}>({ctxName}))";
-                }
+
+                return
+                    $"({valueName} == null ? {ctxName}.Null() : {valueName}.ToJSArray<{type.ItemType}>({ctxName}))";
             }
-            else
-            {
-                if (isItemMarshalable)
-                {
-                    return $"{valueName}.ToJSArrayOf<{type.ItemType}>({ctxName})";
-                }
-                else
-                {
-                    return $"{valueName}.ToJSArray<{type.ItemType}>({ctxName})";
-                }
-            }
+
+            if (isItemMarshalable) return $"{valueName}.ToJSArrayOf<{type.ItemType}>({ctxName})";
+
+            return $"{valueName}.ToJSArray<{type.ItemType}>({ctxName})";
         }
 
         switch (type.SpecialType)
@@ -961,6 +1267,8 @@ public partial class JSBindingGenerator
                 return type.IsNullable
                     ? $"({valueName} == null ? {ctxName}.Null() : {ctxName}.NewString({valueName}))"
                     : $"{ctxName}.NewString({valueName})";
+            case SpecialType.System_Char:
+                return $"{ctxName}.NewString({valueName}.ToString())";
             case SpecialType.System_Boolean:
                 return $"({valueName} ? {ctxName}.True() : {ctxName}.False())";
             case SpecialType.System_Int32:
@@ -1004,7 +1312,10 @@ public partial class JSBindingGenerator
 
         if (type is { IsArray: true, ElementType: not null })
         {
-            if (IsPrimitiveTypeName(type.ElementType))
+            var elementTypeName = type.ElementType.Replace("global::", "");
+            
+            if (IsPrimitiveTypeName(type.ElementType) || 
+                elementTypeName is "System.Object" or "object")
                 return type.IsNullable
                     ? $"({valueName} == null ? {ctxName}.Null() : {valueName}.ToJSArray({ctxName}))"
                     : $"{valueName}.ToJSArray({ctxName})";

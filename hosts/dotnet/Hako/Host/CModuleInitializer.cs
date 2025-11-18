@@ -232,6 +232,12 @@ public sealed class CModuleInitializer : IDisposable
         SetExport(exportName, func);
     }
 
+    public void SetFunctionAsync(string exportName, JSAsyncFunction fn)
+    {
+        using var func = Context.NewFunctionAsync(exportName, fn);
+        SetExport(exportName, func);
+    }
+
     /// <summary>
     /// Creates a fluent builder for defining a JavaScript class export.
     /// </summary>

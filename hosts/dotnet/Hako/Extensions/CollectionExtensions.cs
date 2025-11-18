@@ -352,7 +352,6 @@ public static class CollectionExtensions
             var dateTimeValue = Unsafe.As<T, DateTime>(ref value);
             return realm.NewDate(dateTimeValue);
         }
-
         throw new NotSupportedException(
             $"Array element type {elementType.Name} is not supported. Only primitive types (string, bool, int, long, float, double, etc.) are supported. Use ToJSArrayOf<T>() for custom types implementing IJSMarshalable<T>.");
     }

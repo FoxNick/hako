@@ -18,6 +18,7 @@
         <TieredCompilation>false</TieredCompilation>
         <TieredCompilationQuickJit>false</TieredCompilationQuickJit>
         <WasmtimeStaticLink>true</WasmtimeStaticLink>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     </PropertyGroup>
 
     <ItemGroup>
@@ -28,6 +29,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <PackageReference Include="PortAudioSharp2" Version="1.0.6" />
         <PackageReference Include="Raylib-cs" Version="7.0.2" />
     </ItemGroup>
 

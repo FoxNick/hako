@@ -59,7 +59,7 @@ namespace HakoJS.SourceGeneration;
 /// // const corners: Point[] = getCorners(rect);
 /// </code>
 /// </example>
-[AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
+[AttributeUsage(AttributeTargets.Class, AllowMultiple = true, Inherited = false)]
 public class JSModuleInterfaceAttribute : Attribute
 {
     /// <summary>

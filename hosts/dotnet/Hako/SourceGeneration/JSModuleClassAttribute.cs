@@ -39,7 +39,7 @@ namespace HakoJS.SourceGeneration;
 /// // const v = new Vector2();
 /// </code>
 /// </example>
-[AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
+[AttributeUsage(AttributeTargets.Class, AllowMultiple = true, Inherited = false)]
 public class JSModuleClassAttribute : Attribute
 {
     /// <summary>

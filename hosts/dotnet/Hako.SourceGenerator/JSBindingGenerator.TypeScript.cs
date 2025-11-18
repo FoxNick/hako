@@ -78,6 +78,16 @@ public partial class JSBindingGenerator
         var simpleClassName = ExtractSimpleTypeName(jsClassName);
         dependencies.Remove(simpleClassName);
 
+        // Check for base type
+        string? baseTypeName = null;
+        if (classSymbol?.BaseType != null &&
+            classSymbol.BaseType.SpecialType != SpecialType.System_Object &&
+            classSymbol.BaseType.Name != "Object")
+        {
+            baseTypeName = classSymbol.BaseType.Name;
+            dependencies.Remove(baseTypeName); // Don't import the base type, we'll use extends
+        }
+
         var nestedMarshalables =
             new List<(string TypeName, List<MarshalablePropertyModel> Properties, string? Documentation)>();
         if (classSymbol != null)
@@ -97,9 +107,17 @@ public partial class JSBindingGenerator
         if (!string.IsNullOrWhiteSpace(classDocumentation))
             sb.Append(FormatTsDoc(classDocumentation, indent: 0));
 
-        sb.AppendLine($"declare class {jsClassName} {{");
+        // Check if type is abstract
+        var isAbstract = classSymbol?.IsAbstract ?? false;
+        var abstractModifier = isAbstract ? "abstract " : "";
 
-        if (constructor != null)
+        // Generate class declaration with optional extends clause
+        if (baseTypeName != null)
+            sb.AppendLine($"declare {abstractModifier}class {jsClassName} extends {baseTypeName} {{");
+        else
+            sb.AppendLine($"declare {abstractModifier}class {jsClassName} {{");
+
+        if (constructor != null && !isAbstract)
         {
             var ctorDoc = FormatTsDoc(constructor.Documentation, constructor.ParameterDocs);
             if (!string.IsNullOrWhiteSpace(ctorDoc))
@@ -132,7 +150,8 @@ public partial class JSBindingGenerator
                 sb.Append(methodDoc);
 
             var returnType = method.IsVoid ? "void" : MapTypeToTypeScript(method.ReturnType);
-            sb.AppendLine(RenderMethodSignature(method.JsName, method.Parameters, returnType, method.IsStatic, method.IsAsync));
+            sb.AppendLine(RenderMethodSignature(method.JsName, method.Parameters, returnType, method.IsStatic,
+                method.IsAsync));
         }
 
         sb.AppendLine("}");
@@ -285,7 +304,13 @@ public partial class JSBindingGenerator
                 if (trimmedLine.StartsWith("import "))
                     continue;
 
-                if (trimmedLine.StartsWith("declare class "))
+                // Handle both "declare class" and "declare abstract class"
+                if (trimmedLine.StartsWith("declare abstract class "))
+                {
+                    trimmedLine = "  export abstract class " + trimmedLine.Substring("declare abstract class ".Length);
+                    sb.AppendLine(trimmedLine);
+                }
+                else if (trimmedLine.StartsWith("declare class "))
                 {
                     trimmedLine = "  export class " + trimmedLine.Substring("declare class ".Length);
                     sb.AppendLine(trimmedLine);
@@ -325,9 +350,19 @@ public partial class JSBindingGenerator
 
                 if (trimmedLine.StartsWith("interface "))
                 {
-                    var interfaceName = interfaceRef.ExportName;
-                    trimmedLine = $"  export interface {interfaceName} {{";
-                    sb.AppendLine(trimmedLine);
+                    // Check if it has extends clause
+                    if (trimmedLine.Contains(" extends "))
+                    {
+                        // Extract the full interface declaration including extends
+                        var interfaceDeclaration = trimmedLine.Substring("interface ".Length);
+                        sb.AppendLine($"  export interface {interfaceDeclaration}");
+                    }
+                    else
+                    {
+                        var interfaceName = interfaceRef.ExportName;
+                        trimmedLine = $"  export interface {interfaceName} {{";
+                        sb.AppendLine(trimmedLine);
+                    }
                 }
                 else if (trimmedLine == "}")
                 {
@@ -370,7 +405,8 @@ public partial class JSBindingGenerator
                 sb.Append(methodDoc);
 
             var returnType = method.IsVoid ? "void" : MapTypeToTypeScript(method.ReturnType);
-            sb.AppendLine(RenderFunctionSignature(method.JsName, method.Parameters, returnType, method.IsAsync, indent: 2, isExport: true));
+            sb.AppendLine(RenderFunctionSignature(method.JsName, method.Parameters, returnType, method.IsAsync,
+                2, true));
         }
 
         sb.AppendLine("}");
@@ -382,16 +418,29 @@ public partial class JSBindingGenerator
         string typeName,
         List<RecordParameterModel> parameters,
         string? typeDocumentation = null,
-        bool readOnly = false)
+        bool readOnly = false,
+        INamedTypeSymbol? typeSymbol = null,
+        List<PropertyModel>? properties = null,
+        List<MethodModel>? methods = null)
     {
         var sb = new StringBuilder();
 
         var dependencies = ExtractTypeDependencies(
             new List<ParameterModel>(),
             null,
-            null,
-            null,
+            properties,
+            methods,
             parameters);
+
+        string? baseTypeName = null;
+        if (typeSymbol != null && typeSymbol.HasJSObjectBase())
+        {
+            baseTypeName = typeSymbol.BaseType!.Name;
+            dependencies.Add(baseTypeName);
+        }
+
+        var simpleName = ExtractSimpleTypeName(typeName);
+        dependencies.Remove(simpleName);
 
         var imports = GenerateImportStatements(dependencies);
         if (!string.IsNullOrEmpty(imports))
@@ -400,10 +449,44 @@ public partial class JSBindingGenerator
         if (!string.IsNullOrWhiteSpace(typeDocumentation))
             sb.Append(FormatTsDoc(typeDocumentation, indent: 0));
 
-        sb.AppendLine($"interface {typeName} {{");
+        if (baseTypeName != null)
+            sb.AppendLine($"interface {typeName} extends {baseTypeName} {{");
+        else
+            sb.AppendLine($"interface {typeName} {{");
+
+        var baseProperties = new HashSet<string>();
+        var baseMethods = new HashSet<string>();
+
+        if (typeSymbol != null && typeSymbol.HasJSObjectBase())
+        {
+            var baseCtor = typeSymbol.BaseType!.Constructors
+                .FirstOrDefault(c => c.Parameters.Length > 0 && !c.IsStatic);
+
+            if (baseCtor != null)
+                foreach (var baseParam in baseCtor.Parameters)
+                    baseProperties.Add(ToCamelCase(baseParam.Name));
+
+            foreach (var baseMember in typeSymbol.BaseType.GetMembers().OfType<IMethodSymbol>())
+                if (baseMember.MethodKind == MethodKind.Ordinary)
+                {
+                    var jsAttr = baseMember.GetAttributes()
+                        .FirstOrDefault(a => a.AttributeClass?.Name == "JSMethodAttribute");
+                    if (jsAttr != null)
+                    {
+                        var jsName = ToCamelCase(baseMember.Name);
+                        foreach (var arg in jsAttr.NamedArguments)
+                            if (arg is { Key: "Name", Value.Value: string name })
+                                jsName = name;
+                        baseMethods.Add(jsName);
+                    }
+                }
+        }
 
         foreach (var param in parameters)
         {
+            if (baseProperties.Contains(param.JsName))
+                continue;
+
             var paramDoc = FormatTsDoc(param.Documentation);
             if (!string.IsNullOrWhiteSpace(paramDoc))
                 sb.Append(paramDoc);
@@ -415,6 +498,32 @@ public partial class JSBindingGenerator
             sb.AppendLine(RenderPropertyLine(param.JsName, tsType, isReadonly: readOnly, isOptional: param.IsOptional));
         }
 
+        if (properties != null)
+            foreach (var prop in properties)
+            {
+                var propDoc = FormatTsDoc(prop.Documentation);
+                if (!string.IsNullOrWhiteSpace(propDoc))
+                    sb.Append(propDoc);
+
+                var tsType = MapTypeToTypeScript(prop.TypeInfo, readOnly: !prop.HasSetter);
+                sb.AppendLine(RenderPropertyLine(prop.JsName, tsType, prop.IsStatic, !prop.HasSetter));
+            }
+
+        if (methods != null)
+            foreach (var method in methods)
+            {
+                if (baseMethods.Contains(method.JsName))
+                    continue;
+
+                var methodDoc = FormatTsDoc(method.Documentation, method.ParameterDocs, method.ReturnDoc);
+                if (!string.IsNullOrWhiteSpace(methodDoc))
+                    sb.Append(methodDoc);
+
+                var returnType = method.IsVoid ? "void" : MapTypeToTypeScript(method.ReturnType);
+                sb.AppendLine(RenderMethodSignature(method.JsName, method.Parameters, returnType, method.IsStatic,
+                    method.IsAsync));
+            }
+
         sb.AppendLine("}");
 
         return sb.ToString();
@@ -424,13 +533,26 @@ public partial class JSBindingGenerator
         string typeName,
         List<MarshalablePropertyModel> properties,
         string? documentation = null,
-        bool readOnly = false)
+        bool readOnly = false,
+        INamedTypeSymbol? typeSymbol = null)
     {
         var sb = new StringBuilder();
 
         var dependencies = new HashSet<string>();
         foreach (var prop in properties)
             AddTypeDependency(dependencies, prop.TypeInfo);
+
+        // Check for base type
+        string? baseTypeName = null;
+        if (typeSymbol?.BaseType != null &&
+            typeSymbol.BaseType.SpecialType != SpecialType.System_Object &&
+            typeSymbol.BaseType.Name != "Object")
+        {
+            baseTypeName = typeSymbol.BaseType.Name;
+            dependencies.Remove(baseTypeName); // Don't import the base type, we'll use extends
+        }
+
+        dependencies.Remove(typeName); // Don't import ourselves
 
         var imports = GenerateImportStatements(dependencies);
         if (!string.IsNullOrEmpty(imports))
@@ -439,7 +561,11 @@ public partial class JSBindingGenerator
         if (!string.IsNullOrWhiteSpace(documentation))
             sb.Append(FormatTsDoc(documentation, indent: 0));
 
-        sb.AppendLine($"interface {typeName} {{");
+        // Generate interface with optional extends clause
+        if (baseTypeName != null)
+            sb.AppendLine($"interface {typeName} extends {baseTypeName} {{");
+        else
+            sb.AppendLine($"interface {typeName} {{");
 
         foreach (var prop in properties)
         {
@@ -465,7 +591,9 @@ public partial class JSBindingGenerator
             return $"{p.Name}{optional}: {tsType}";
         }));
 
-        var returnType = delegateInfo.IsVoid ? "void" : MapTypeToTypeScript(delegateInfo.ReturnType, readOnly: readOnly);
+        var returnType = delegateInfo.IsVoid
+            ? "void"
+            : MapTypeToTypeScript(delegateInfo.ReturnType, readOnly: readOnly);
 
         if (delegateInfo.IsAsync)
             returnType = $"Promise<{returnType}>";
@@ -478,7 +606,7 @@ public partial class JSBindingGenerator
     #region TypeScript Rendering Helpers
 
     /// <summary>
-    /// Renders a TypeScript property line with all modifiers
+    ///     Renders a TypeScript property line with all modifiers
     /// </summary>
     private static string RenderPropertyLine(
         string propertyName,
@@ -496,7 +624,7 @@ public partial class JSBindingGenerator
     }
 
     /// <summary>
-    /// Renders a TypeScript method signature with all modifiers
+    ///     Renders a TypeScript method signature with all modifiers
     /// </summary>
     private static string RenderMethodSignature(
         string methodName,
@@ -516,7 +644,7 @@ public partial class JSBindingGenerator
     }
 
     /// <summary>
-    /// Renders a TypeScript function signature (for module exports)
+    ///     Renders a TypeScript function signature (for module exports)
     /// </summary>
     private static string RenderFunctionSignature(
         string functionName,
@@ -536,7 +664,7 @@ public partial class JSBindingGenerator
     }
 
     /// <summary>
-    /// Renders a single parameter with optional modifier
+    ///     Renders a single parameter with optional modifier
     /// </summary>
     private static string RenderParameter(ParameterModel param, bool readOnly = false)
     {
@@ -622,6 +750,7 @@ public partial class JSBindingGenerator
         switch (type.SpecialType)
         {
             case SpecialType.System_String:
+            case SpecialType.System_Char:
                 return "string";
             case SpecialType.System_Boolean:
                 return "boolean";
@@ -695,10 +824,7 @@ public partial class JSBindingGenerator
         var typeName = lastDot >= 0 ? fullName.Substring(lastDot + 1) : fullName;
 
         // Check if this type is a readonly JSObject
-        if (readOnly && IsReadOnlyJSObject(typeName))
-        {
-            return $"Readonly<{typeName}>";
-        }
+        if (readOnly && IsReadOnlyJSObject(typeName)) return $"Readonly<{typeName}>";
 
         return typeName;
     }
@@ -706,10 +832,8 @@ public partial class JSBindingGenerator
     private static bool IsReadOnlyJSObject(string typeName)
     {
         // Check if this type is tracked as a readonly JSObject in our dependencies
-        if (TypeDependencies.TryGetValue(typeName, out var dependency))
-        {
-            return dependency.IsReadOnly;
-        }
+        if (TypeDependencies.TryGetValue(typeName, out var dependency)) return dependency.IsReadOnly;
+
         return false;
     }
 

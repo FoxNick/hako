@@ -21,6 +21,11 @@ internal sealed class ValueFactory(Realm context) : IDisposable
 
         if (value == null) return CreateNull();
 
+        if (Context.TryProject(value, out var result))
+        {
+            return result;
+        }
+
         return value switch
         {
             IJSMarshalable marshalable => marshalable.ToJSValue(Context),
@@ -202,7 +207,7 @@ internal sealed class ValueFactory(Realm context) : IDisposable
         if (error != null)
         {
             Context.FreeValuePointer(datePtr);
-            throw error;
+            throw new HakoException($"Error creating Date", error);
         }
 
         return new JSValue(Context, datePtr);
@@ -289,9 +294,13 @@ internal sealed class ValueFactory(Realm context) : IDisposable
 
         foreach (DictionaryEntry entry in dict)
         {
-            var key = entry.Key?.ToString() ?? "";
-            using var propValue = FromNativeValue(entry.Value, options);
-            jsObj.SetProperty(key, propValue);
+            var key = entry.Key.ToString();
+            if (!string.IsNullOrEmpty(key))
+            {
+                using var propValue = FromNativeValue(entry.Value, options);
+                jsObj.SetProperty(key, propValue);
+            }
+           
         }
 
         return jsObj.Dup();
