@@ -189,4 +189,17 @@ internal static class TypeSymbolExtensions
                 break;
         }
     }
+    
+    public static bool IsJSEnum(this ITypeSymbol typeSymbol)
+    {
+        return typeSymbol.TypeKind == TypeKind.Enum &&
+               HasAttribute(typeSymbol, "HakoJS.SourceGeneration.JSEnumAttribute");
+    }
+
+    public static bool IsJSEnumFlags(this ITypeSymbol typeSymbol)
+    {
+        return typeSymbol.IsJSEnum() &&
+               typeSymbol.GetAttributes()
+                   .Any(a => a.AttributeClass?.ToDisplayString() == "System.FlagsAttribute");
+    }
 }

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -104,6 +105,81 @@ public partial class JSBindingGenerator
         sb.AppendLine();
 
         var accessibility = GetAccessibilityModifier(model.DeclaredAccessibility);
+
+        // Generate the extension class for ToStringFast
+        sb.AppendLine($"{accessibility} static class {model.EnumName}Extensions");
+        sb.AppendLine("{");
+
+        // Generate ToStringFast method
+        sb.AppendLine($"    {accessibility} static string ToStringFast(this {model.EnumName} value)");
+
+        if (model.IsFlags)
+        {
+            // For flags enums, handle combined values
+            sb.AppendLine("    {");
+            sb.AppendLine("        return value switch");
+            sb.AppendLine("        {");
+
+            // Add case for zero
+            var zeroValue = model.Values.FirstOrDefault(v => Convert.ToInt64(v.Value) == 0);
+            if (zeroValue != null)
+            {
+                sb.AppendLine($"            0 => nameof({model.EnumName}.{zeroValue.Name}),");
+            }
+            else
+            {
+                sb.AppendLine("            0 => \"0\",");
+            }
+
+            // Add cases for individual known values
+            foreach (var enumValue in model.Values.Where(v => Convert.ToInt64(v.Value) != 0))
+            {
+                sb.AppendLine(
+                    $"            {model.EnumName}.{enumValue.Name} => nameof({model.EnumName}.{enumValue.Name}),");
+            }
+
+            sb.AppendLine("            _ => FormatFlags(value)");
+            sb.AppendLine("        };");
+            sb.AppendLine();
+
+            // Generate the helper method for building the flags string
+            sb.AppendLine($"        static string FormatFlags({model.EnumName} value)");
+            sb.AppendLine("        {");
+            sb.AppendLine("            var flags = new System.Collections.Generic.List<string>();");
+            sb.AppendLine();
+
+            foreach (var enumValue in model.Values.Where(v => Convert.ToInt64(v.Value) != 0))
+            {
+                var enumValueLong = Convert.ToInt64(enumValue.Value);
+                sb.AppendLine(
+                    $"            if ((value & {model.EnumName}.{enumValue.Name}) == {model.EnumName}.{enumValue.Name})");
+                sb.AppendLine($"                flags.Add(nameof({model.EnumName}.{enumValue.Name}));");
+            }
+
+            sb.AppendLine();
+            sb.AppendLine("            return flags.Count > 0 ? string.Join(\", \", flags) : value.ToString();");
+            sb.AppendLine("        }");
+            sb.AppendLine("    }");
+        }
+        else
+        {
+            // For normal enums, use a switch expression
+            sb.AppendLine("        => value switch");
+            sb.AppendLine("        {");
+
+            foreach (var enumValue in model.Values)
+            {
+                sb.AppendLine(
+                    $"            {model.EnumName}.{enumValue.Name} => nameof({model.EnumName}.{enumValue.Name}),");
+            }
+
+            sb.AppendLine("            _ => value.ToString(),");
+            sb.AppendLine("        };");
+        }
+
+        sb.AppendLine("}");
+        sb.AppendLine();
+
         var useCSharp14Extensions = compilationSettings.LanguageVersion is >= LanguageVersion.CSharp14;
 
         if (useCSharp14Extensions)

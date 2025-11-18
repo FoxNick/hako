@@ -830,6 +830,39 @@ public sealed class Realm : IDisposable
     {
         return _valueFactory.FromNativeValue(Array.Empty<object>());
     }
+    
+    /// <summary>
+    /// Creates a new JavaScript array from a variable number of JSValue objects.
+    /// </summary>
+    /// <param name="items">The JSValue objects to populate the array with.</param>
+    /// <returns>A <see cref="JSValue"/> representing the new array.</returns>
+    public JSValue NewArray(params object[] items)
+    {
+        var array = NewArray();
+        try
+        {
+            for (int i = 0; i < items.Length; i++)
+            {
+                array.SetProperty(i, items[i]);
+            }
+            return array;
+        }
+        catch
+        {
+            array.Dispose();
+            throw;
+        }
+    }
+    
+    /// <summary>
+    /// Creates a new JavaScript array from an enumerable collection of JSValue objects.
+    /// </summary>
+    /// <param name="items">The JSValue objects to populate the array with.</param>
+    /// <returns>A <see cref="JSValue"/> representing the new array.</returns>
+    public JSValue NewArray(IEnumerable<object> items)
+    {
+        return NewArray(items.ToArray());
+    }
 
     /// <summary>
     /// Creates a new ArrayBuffer from byte data.

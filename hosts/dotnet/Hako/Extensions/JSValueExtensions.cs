@@ -625,6 +625,7 @@ public static class JSValueExtensions
 
         return array;
     }
+    
 
     /// <summary>
     ///     Converts a JavaScript array to a .NET array of types implementing <see cref="IJSMarshalable{T}" />.

@@ -5229,7 +5229,7 @@ public partial class FileHandler
         var generatedCode = result.GeneratedTrees.First(t => t.FilePath.Contains("FileHandler")).GetText().ToString();
 
         // Should marshal enum as string
-        Assert.Contains(".ToString())", generatedCode);
+        Assert.Contains(".ToStringFast())", generatedCode);
         Assert.Contains("ctx.NewString", generatedCode);
 
         // Should unmarshal enum from string
@@ -5332,7 +5332,7 @@ public partial class User
 
         // Should handle nullable enum marshaling
         Assert.Contains("ctx.Null()", generatedCode);
-        Assert.Contains(".ToString())", generatedCode);
+        Assert.Contains(".ToStringFast())", generatedCode);
 
         // Should handle nullable enum unmarshaling
         Assert.Contains("IsNullOrUndefined()", generatedCode);
@@ -5375,8 +5375,7 @@ public partial class TaskManager
         var generatedCode = result.GeneratedTrees.First(t => t.FilePath.Contains("TaskManager")).GetText().ToString();
 
         // Should handle enum arrays
-        Assert.Contains("ToJSArrayOf", generatedCode);
-        Assert.Contains("ToArrayOf<global::TestNamespace.Priority>", generatedCode);
+        Assert.Contains(" var Priorities = args[0].ToArray<string>().Select(x => global::System.Enum.Parse<global::TestNamespace.Priority>(x, ignoreCase: true)).ToArray();", generatedCode);
     }
 
     [Fact]
@@ -5412,7 +5411,7 @@ public partial record LogEntry(
 
         // ToJSValue should marshal enum
         Assert.Contains("realm.NewString", generatedCode);
-        Assert.Contains(".ToString())", generatedCode);
+        Assert.Contains(".ToStringFast())", generatedCode);
 
         // FromJSValue should unmarshal enum
         Assert.Contains("global::System.Enum.Parse<", generatedCode);
@@ -5459,7 +5458,7 @@ public partial class HttpModule
 
         // Should marshal enum in module
         Assert.Contains("ctx.NewString", generatedCode);
-        Assert.Contains(".ToString())", generatedCode);
+        Assert.Contains(".ToStringFast())", generatedCode);
 
         // Should unmarshal enum from module method parameter
         Assert.Contains("global::System.Enum.Parse<", generatedCode);

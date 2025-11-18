@@ -1766,16 +1766,20 @@ public partial class JSBindingGenerator : IIncrementalGenerator
         var isArray = type.TypeKind == TypeKind.Array;
 
         string? elementType = null;
+        ITypeSymbol? itemTypeSymbol = null;
+
         if (isArray && type is IArrayTypeSymbol arrayType)
+        {
+            itemTypeSymbol = arrayType.ElementType;
             elementType = arrayType.ElementType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+        }
 
         var specialType = type.SpecialType;
 
         ITypeSymbol? underlyingType = null;
         if (type.IsNullableValueType() && type is INamedTypeSymbol { TypeArguments.Length: > 0 } namedType)
             underlyingType = namedType.TypeArguments[0];
-
-        // Check if it's a [JSEnum]
+        
         var isEnum = false;
         var isFlags = false;
 
@@ -1788,8 +1792,7 @@ public partial class JSBindingGenerator : IIncrementalGenerator
                 isFlags = enumSymbol.GetAttributes()
                     .Any(a => a.AttributeClass?.ToDisplayString() == "System.FlagsAttribute");
         }
-
-        // Check if it's a generic dictionary
+        
         var isGenericDictionary = false;
         string? keyType = null;
         string? valueType = null;
@@ -1811,13 +1814,11 @@ public partial class JSBindingGenerator : IIncrementalGenerator
                     valueType = valueTypeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
                 }
         }
-
-        // Check if it's a generic collection
+        
         var isGenericCollection = false;
         string? itemType = null;
-        ITypeSymbol? itemTypeSymbol = null;
 
-        if (type is INamedTypeSymbol { IsGenericType: true } collectionType && !isGenericDictionary)
+        if (type is INamedTypeSymbol { IsGenericType: true } collectionType && !isGenericDictionary && !isArray)
         {
             var typeDefinition = collectionType.ConstructedFrom.ToDisplayString();
             if (typeDefinition is "System.Collections.Generic.List<T>" or

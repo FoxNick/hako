@@ -1150,6 +1150,22 @@ public partial class JSBindingGenerator
         {
             var elementTypeName = type.ElementType.Replace("global::", "");
 
+            // Check if element is a [JSEnum]
+            if (type.ItemTypeSymbol != null && type.ItemTypeSymbol.IsJSEnum())
+            {
+                var fullEnumType = type.ItemTypeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+
+                if (type.ItemTypeSymbol.IsJSEnumFlags())
+                {
+                    return $"{jsValueName}.ToArray<int>().Select(x => ({fullEnumType})x).ToArray()";
+                }
+                else
+                {
+                    return
+                        $"{jsValueName}.ToArray<string>().Select(x => global::System.Enum.Parse<{fullEnumType}>(x, ignoreCase: true)).ToArray()";
+                }
+            }
+
             if (IsPrimitiveTypeName(type.ElementType) ||
                 elementTypeName is "System.Object" or "object")
                 return $"{jsValueName}.ToArray<{type.ElementType}>()";
@@ -1198,6 +1214,25 @@ public partial class JSBindingGenerator
         if (type.FullName == "global::System.Byte[]")
             return
                 $"({jsValueName}.IsArrayBuffer() ? {jsValueName}.CopyArrayBuffer() : {jsValueName}.CopyTypedArray())";
+
+        if (type is { IsArray: true, ElementType: not null })
+        {
+            // Check if element is a [JSEnum]
+            if (type.ItemTypeSymbol != null && type.ItemTypeSymbol.IsJSEnum())
+            {
+                var fullEnumType = type.ItemTypeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+
+                if (type.ItemTypeSymbol.IsJSEnumFlags())
+                {
+                    return $"{jsValueName}.ToArray<int>().Select(x => ({fullEnumType})x).ToArray()";
+                }
+                else
+                {
+                    return
+                        $"{jsValueName}.ToArray<string>().Select(x => global::System.Enum.Parse<{fullEnumType}>(x, ignoreCase: true)).ToArray()";
+                }
+            }
+        }
 
         return $"{type.FullName}.FromJSValue({contextVarName}, {jsValueName})";
     }
@@ -1368,8 +1403,8 @@ public partial class JSBindingGenerator
                     : $"{ctxName}.NewNumber((int){valueName})";
 
             return type.IsNullable
-                ? $"({valueName} == null ? {ctxName}.Null() : {ctxName}.NewString({valueName}.ToString()))"
-                : $"{ctxName}.NewString({valueName}.ToString())";
+                ? $"({valueName} == null ? {ctxName}.Null() : {ctxName}.NewString({valueName}.ToStringFast()))"
+                : $"{ctxName}.NewString({valueName}.ToStringFast())";
         }
 
         if (type.FullName == "global::System.Byte[]")
@@ -1380,6 +1415,23 @@ public partial class JSBindingGenerator
         if (type is { IsArray: true, ElementType: not null })
         {
             var elementTypeName = type.ElementType.Replace("global::", "");
+
+            // Check if element is a [JSEnum]
+            if (type.ItemTypeSymbol != null && type.ItemTypeSymbol.IsJSEnum())
+            {
+                if (type.ItemTypeSymbol.IsJSEnumFlags())
+                {
+                    return type.IsNullable
+                        ? $"({valueName} == null ? {ctxName}.Null() : {ctxName}.NewArray({valueName}.Select(x => (int)x)))"
+                        : $"{ctxName}.NewArray({valueName}.Select(x => (int)x))";
+                }
+                else
+                {
+                    return type.IsNullable
+                        ? $"({valueName} == null ? {ctxName}.Null() : {ctxName}.NewArray({valueName}.Select(x => x.ToStringFast())))"
+                        : $"{ctxName}.NewArray({valueName}.Select(x => x.ToStringFast()))";
+                }
+            }
 
             if (IsPrimitiveTypeName(type.ElementType) ||
                 elementTypeName is "System.Object" or "object")
