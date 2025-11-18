@@ -40,37 +40,18 @@ public partial class JSBindingGenerator
 
         sb.AppendLine();
 
-        var hasDelegates = model.Parameters.Any(p => p.IsDelegate);
-        var implementsDisposable = hasDelegates ? ", global::System.IDisposable" : "";
-
-        // Add abstract modifier if needed
         var abstractModifier = model.IsAbstract() ? "abstract " : "";
 
         sb.AppendLine(
-            $"{abstractModifier}partial record {model.TypeName} : global::HakoJS.SourceGeneration.IJSMarshalable<{model.TypeName}>, global::HakoJS.SourceGeneration.IDefinitelyTyped<{model.TypeName}>{implementsDisposable}");
+            $"{abstractModifier}partial record {model.TypeName} : global::HakoJS.SourceGeneration.IJSMarshalable<{model.TypeName}>, global::HakoJS.SourceGeneration.IDefinitelyTyped<{model.TypeName}>");
         sb.AppendLine("{");
-
-        if (hasDelegates)
-        {
-            foreach (var param in model.Parameters.Where(p => p.IsDelegate))
-                sb.AppendLine($"    private global::HakoJS.VM.JSValue? _captured{ToPascalCase(param.Name)};");
-
-            sb.AppendLine();
-        }
 
         GenerateObjectToJSValue(sb, model);
         sb.AppendLine();
         GenerateObjectFromJSValue(sb, model);
 
-        if (hasDelegates)
-        {
-            sb.AppendLine();
-            GenerateObjectDispose(sb, model);
-        }
-
         sb.AppendLine();
 
-        // TypeDefinition also needs 'new' modifier if it has a JSObject base
         var newModifier = model.HasJSObjectBase() ? "new " : "";
         sb.AppendLine($"    public static {newModifier}string TypeDefinition");
         sb.AppendLine("    {");
@@ -414,15 +395,6 @@ public partial class JSBindingGenerator
             return;
         }
 
-        var delegateParams = model.Parameters.Where(p => p.IsDelegate).ToList();
-        if (delegateParams.Any())
-        {
-            foreach (var param in delegateParams)
-                sb.AppendLine($"        global::HakoJS.VM.JSValue? captured{ToPascalCase(param.Name)} = null;");
-
-            sb.AppendLine();
-        }
-
         foreach (var param in model.ConstructorParameters)
         {
             if (param.IsDelegate && param.DelegateInfo != null)
@@ -436,14 +408,6 @@ public partial class JSBindingGenerator
         var constructorArgs = string.Join(", ",
             model.ConstructorParameters.Select(p => EscapeIdentifierIfNeeded(ToCamelCase(p.Name))));
         sb.AppendLine($"        var instance = new {model.TypeName}({constructorArgs});");
-
-        if (delegateParams.Any())
-        {
-            sb.AppendLine();
-            foreach (var param in delegateParams)
-                sb.AppendLine(
-                    $"        instance._captured{ToPascalCase(param.Name)} = captured{ToPascalCase(param.Name)};");
-        }
 
         sb.AppendLine();
         sb.AppendLine("        return instance;");
@@ -469,12 +433,12 @@ public partial class JSBindingGenerator
                 $"{indent}    throw new global::System.InvalidOperationException(\"Property '{param.JsName}' must be a function\");");
             sb.AppendLine();
 
-            sb.AppendLine($"{indent}captured{ToPascalCase(param.Name)} = {propVarName}.Dup();");
+            sb.AppendLine($"{indent}var captured{ToPascalCase(param.Name)} = {propVarName}.Dup();");
+            sb.AppendLine($"{indent}realm.TrackValue(captured{ToPascalCase(param.Name)});");
             GenerateDelegateWrapper(sb, param, $"{indent}var {localVarName} = ", ";");
         }
         else
         {
-            // Add nullable marker for optional reference types
             var typeDeclaration = param.TypeInfo.FullName;
             if (!param.TypeInfo.IsValueType && !typeDeclaration.EndsWith("?"))
                 typeDeclaration += "?";
@@ -490,7 +454,8 @@ public partial class JSBindingGenerator
             sb.AppendLine(
                 $"{indent}        throw new global::System.InvalidOperationException(\"Property '{param.JsName}' must be a function\");");
             sb.AppendLine();
-            sb.AppendLine($"{indent}    captured{ToPascalCase(param.Name)} = {propVarName}.Dup();");
+            sb.AppendLine($"{indent}    var captured{ToPascalCase(param.Name)} = {propVarName}.Dup();");
+            sb.AppendLine($"{indent}    realm.TrackValue(captured{ToPascalCase(param.Name)});");
             GenerateDelegateWrapper(sb, param, $"{indent}    {localVarName} = ", ";");
             sb.AppendLine($"{indent}}}");
         }
@@ -685,20 +650,6 @@ public partial class JSBindingGenerator
                 $"{indent}    {localVarName} = {GetStrictUnmarshalCode(param.TypeInfo, propVarName, "realm")};");
             sb.AppendLine($"{indent}}}");
         }
-    }
-
-    private static void GenerateObjectDispose(StringBuilder sb, ObjectModel model)
-    {
-        sb.AppendLine("    public void Dispose()");
-        sb.AppendLine("    {");
-
-        foreach (var param in model.Parameters.Where(p => p.IsDelegate))
-        {
-            sb.AppendLine($"        _captured{ToPascalCase(param.Name)}?.Dispose();");
-            sb.AppendLine($"        _captured{ToPascalCase(param.Name)} = null;");
-        }
-
-        sb.AppendLine("    }");
     }
 
     #endregion

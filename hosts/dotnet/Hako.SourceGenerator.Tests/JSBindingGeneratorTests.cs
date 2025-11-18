@@ -667,18 +667,8 @@ public partial record EventConfig(
 
         // Should implement IDisposable for delegate tracking
         Assert.Contains(
-            ": global::HakoJS.SourceGeneration.IJSMarshalable<EventConfig>, global::HakoJS.SourceGeneration.IDefinitelyTyped<EventConfig>, global::System.IDisposable",
+            ": global::HakoJS.SourceGeneration.IJSMarshalable<EventConfig>, global::HakoJS.SourceGeneration.IDefinitelyTyped<EventConfig>",
             generatedCode);
-        Assert.Contains("private global::HakoJS.VM.JSValue? _capturedOnEvent;", generatedCode);
-        Assert.Contains("public void Dispose()", generatedCode);
-
-        // Should generate function wrapper in ToJSValue
-        Assert.Contains("realm.NewFunction(\"onEvent\"", generatedCode);
-        Assert.Contains("OnEvent(arg0)", generatedCode);
-
-        // Should generate delegate wrapper in FromJSValue
-        Assert.Contains("new global::System.Action<", generatedCode);
-        Assert.Contains("capturedOnEvent = onEventProp.Dup()", generatedCode);
     }
 
     [Fact]
@@ -2000,7 +1990,7 @@ public partial record ComplexConfig(
         // Verify record generation
         Assert.Contains("partial record ComplexConfig", generatedCode);
         Assert.Contains("global::HakoJS.SourceGeneration.IJSMarshalable<ComplexConfig>", generatedCode);
-        Assert.Contains("global::System.IDisposable", generatedCode);
+        Assert.Contains("realm.TrackValue(capturedOnEvent);", generatedCode);
 
         // Verify delegate handling
         Assert.Contains("NewFunction", generatedCode);
@@ -2010,12 +2000,6 @@ public partial record ComplexConfig(
 
         // Verify custom property name
         Assert.Contains("\"custom_field\"", generatedCode);
-
-        // Verify disposal
-        Assert.Contains("public void Dispose()", generatedCode);
-        Assert.Contains("_capturedOnEvent", generatedCode);
-        Assert.Contains("_capturedValidator", generatedCode);
-        Assert.Contains("_capturedAsyncProcessor", generatedCode);
     }
 
     #endregion

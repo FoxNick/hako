@@ -52,6 +52,7 @@ public sealed class Realm : IDisposable
     private JSValue? _symbolAsyncIterator;
     private JSValue? _symbolIterator;
     private TimerManager? _timerManager;
+    private readonly ConcurrentHashSet<JSValue> _trackedValues = new();
 
     /// <summary>
     /// Initializes a new instance of the <see cref="Realm"/> class.
@@ -81,6 +82,7 @@ public sealed class Realm : IDisposable
             return _timerManager ??= new TimerManager(this);
         }
     }
+    
 
     /// <summary>
     /// Gets the QuickJS context pointer for this realm.
@@ -108,6 +110,14 @@ public sealed class Realm : IDisposable
     public void Dispose()
     {
         if (_disposed) return;
+        
+        foreach (var value in _trackedValues)
+        {
+           value.Dispose();
+        }
+        
+        _trackedValues.Clear();
+        _trackedValues.Dispose();
 
         _timerManager?.Dispose();
         _valueFactory.Dispose();
@@ -128,6 +138,38 @@ public sealed class Realm : IDisposable
         Runtime.DropRealm(this);
 
         _disposed = true;
+    }
+    
+    /// <summary>
+    /// Registers a JSValue for automatic cleanup when the realm is disposed.
+    /// Use this for captured delegates or other long-lived JSValues in JSObjects.
+    /// </summary>
+    /// <param name="value">The JSValue to track.</param>
+    /// <remarks>
+    /// Tracked values are automatically disposed when the realm is disposed,
+    /// preventing memory leaks from captured delegate closures.
+    /// </remarks>
+    public void TrackValue(JSValue? value)
+    {
+        if (value == null) return;
+        if(!_trackedValues.Add(value))
+        {
+            throw new HakoException("Tracked value already tracked");
+        }
+    }
+    
+    /// <summary>
+    /// Unregisters a previously tracked JSValue.
+    /// Call this if you manually dispose a tracked value before the realm is disposed.
+    /// </summary>
+    /// <param name="value">The JSValue to stop tracking.</param>
+    public void UntrackValue(JSValue? value)
+    {
+        if (value == null) return;
+        if (!_trackedValues.Remove(value))
+        {
+            throw new HakoException("Tracked value already untracked");
+        }
     }
 
     #endregion
