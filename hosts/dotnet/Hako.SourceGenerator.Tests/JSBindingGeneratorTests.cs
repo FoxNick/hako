@@ -741,7 +741,7 @@ public partial record AsyncConfig(
         Assert.Contains("await Initialize", generatedCode);
 
         // FromJSValue: Should handle promise awaiting when calling JS functions from C#
-        Assert.Contains("await result.Await()", generatedCode);
+        Assert.Contains("await capturedInitialize!.InvokeAsync();", generatedCode);
     }
 
     [Fact]
@@ -762,7 +762,7 @@ public partial record Person(string Name, Address HomeAddress);
         var result = RunGenerator(source);
 
         Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-        Assert.Equal(13, result.GeneratedTrees.Length);
+        Assert.Equal(14, result.GeneratedTrees.Length);
 
         var personCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Person")).GetText().ToString();
 
@@ -940,7 +940,7 @@ public partial record Transform(
 
         // Should allow JSClass types in records
         Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
-        Assert.Equal(13, result.GeneratedTrees.Length);
+        Assert.Equal(14, result.GeneratedTrees.Length);
 
         var transformCode = result.GeneratedTrees.First(t => t.FilePath.Contains("Transform")).GetText().ToString();
 
@@ -1820,7 +1820,7 @@ public partial class Transform
         Assert.Empty(result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error));
 
         // Should generate code for both classes
-        Assert.Equal(13, result.GeneratedTrees.Length);
+        Assert.Equal(14, result.GeneratedTrees.Length);
 
         // Verify Vector2 generation
         var vector2Code = result.GeneratedTrees.First(t => t.FilePath.Contains("Vector2")).GetText().ToString();
@@ -2179,8 +2179,7 @@ public partial record Config(
         // In FromJSValue, should create delegate with actual parameter names
         Assert.Contains("int value", generatedCode);
         Assert.Contains("string context", generatedCode);
-        Assert.Contains("using var valueJs = realm.NewValue(value)", generatedCode);
-        Assert.Contains("using var contextJs = realm.NewValue(context)", generatedCode);
+        Assert.Contains("using var result = capturedValidate!.Invoke(value, context);", generatedCode);
 
         // Should NOT use generic names
         Assert.DoesNotContain("int arg0", generatedCode);
@@ -2211,8 +2210,7 @@ public partial record Config(
         // In FromJSValue, should use generic arg0, arg1 for Func
         Assert.Contains("string arg0", generatedCode);
         Assert.Contains("int arg1", generatedCode);
-        Assert.Contains("using var arg0Js = realm.NewValue(arg0)", generatedCode);
-        Assert.Contains("using var arg1Js = realm.NewValue(arg1)", generatedCode);
+        Assert.Contains("using var result = capturedProcess!.Invoke(arg0, arg1);", generatedCode);
     }
 
     [Fact]

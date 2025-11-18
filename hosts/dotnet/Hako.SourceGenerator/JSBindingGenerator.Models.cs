@@ -53,6 +53,7 @@ public partial class JSBindingGenerator
         public List<MethodModel> Methods { get; set; } = new();
         public string TypeScriptDefinition { get; set; } = "";
         public string? Documentation { get; set; }
+        public INamedTypeSymbol? TypeSymbol { get; set; }
     }
 
     private class ModuleModel
@@ -75,10 +76,34 @@ public partial class JSBindingGenerator
         public string TypeName { get; set; } = "";
         public string SourceNamespace { get; set; } = "";
         public List<RecordParameterModel> Parameters { get; set; } = new();
+        public List<RecordParameterModel> ConstructorParameters { get; set; } = new();
+        public List<PropertyModel> Properties { get; set; } = new();
+        public List<MethodModel> Methods { get; set; } = new();
         public string TypeScriptDefinition { get; set; } = "";
         public string? Documentation { get; set; }
-        
         public bool ReadOnly { get; set; } = true;
+        public INamedTypeSymbol? TypeSymbol { get; set; }
+
+        public bool IsAbstract()
+        {
+            return TypeSymbol is { IsAbstract: true };
+        }
+
+        public bool HasJSObjectBase()
+        {
+            return TypeSymbol is not null && TypeSymbol.BaseType != null &&
+                   TypeSymbol.BaseType.SpecialType != SpecialType.System_Object &&
+                   HasAttribute(TypeSymbol.BaseType, JSObjectAttributeName);
+        }
+
+        public uint GetTypeId()
+        {
+            var fullTypeName = string.IsNullOrEmpty(SourceNamespace)
+                ? TypeName
+                : $"{SourceNamespace}.{TypeName}";
+
+            return fullTypeName.HashString();
+        }
     }
 
     private class MarshalableModel
@@ -91,7 +116,7 @@ public partial class JSBindingGenerator
         public bool IsNested { get; set; }
         public string? ParentClassName { get; set; }
         public string TypeKind { get; set; } = "class";
-        public bool ReadOnly { get; set; } = false;
+        public bool ReadOnly { get; set; }
     }
 
     private class MarshalablePropertyModel
@@ -174,7 +199,7 @@ public partial class JSBindingGenerator
         public string TypeScriptDefinition { get; set; } = "";
         public string? Documentation { get; set; }
         public List<RecordParameterModel> Parameters { get; set; } = new();
-        
+
         public bool ReadOnly { get; set; } = true;
     }
 

@@ -101,7 +101,7 @@ namespace HakoJS.SourceGeneration;
 /// // export type FileAccess = (typeof FileAccess)[keyof typeof FileAccess];
 /// </code>
 /// </example>
-[AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
+[AttributeUsage(AttributeTargets.Class, AllowMultiple = true, Inherited = false)]
 public class JSModuleEnumAttribute : Attribute
 {
     /// <summary>

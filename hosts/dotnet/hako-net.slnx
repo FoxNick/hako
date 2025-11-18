@@ -9,6 +9,7 @@
     <Project Path="examples\iteration\iteration.csproj" Type="Classic C#" />
     <Project Path="examples\marshaling\marshaling.csproj" Type="Classic C#" />
     <Project Path="examples\modules\modules.csproj" Type="Classic C#" />
+    <Project Path="examples\polymorphin\polymorphin.csproj" Type="Classic C#" />
     <Project Path="examples\raylib\raylib.csproj" Type="Classic C#" />
     <Project Path="examples\safety\safety.csproj" Type="Classic C#" />
     <Project Path="examples\scopes\scopes.csproj" Type="Classic C#" />

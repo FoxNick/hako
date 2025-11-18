@@ -33,7 +33,7 @@ namespace HakoJS.SourceGeneration;
 /// // increment(10, 5);       // 15
 /// </code>
 /// </example>
-[AttributeUsage(AttributeTargets.Method)]
+[AttributeUsage(AttributeTargets.Method, Inherited = false)]
 public class JSModuleMethodAttribute : Attribute
 {
     /// <summary>

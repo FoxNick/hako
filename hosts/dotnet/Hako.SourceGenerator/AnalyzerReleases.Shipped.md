@@ -1,3 +1,11 @@
+## Release 1.0.7
+
+### New Rules
+
+Rule ID | Category | Severity | Notes
+--------|----------|----------|-------
+HAKO023 | HakoJS.SourceGenerator | Error | Class must be concrete
+
 ## Release 1.0.6
 
 ### New Rules

@@ -30,7 +30,7 @@ namespace HakoJS.SourceGeneration;
 /// // import { PI, add, fetchAsync } from 'math';
 /// </code>
 /// </example>
-[AttributeUsage(AttributeTargets.Class)]
+[AttributeUsage(AttributeTargets.Class, Inherited = false)]
 public class JSModuleAttribute : Attribute
 {
     /// <summary>

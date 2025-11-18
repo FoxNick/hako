@@ -156,6 +156,8 @@ public partial class JSBindingGenerator
         sb.AppendLine("        var jsClass = builder.Build();");
         sb.AppendLine();
         sb.AppendLine($"        realm.Runtime.RegisterJSClass<{model.ClassName}>(jsClass);");
+        sb.AppendLine(
+            $"        global::HakoJS.SourceGeneration.JSMarshalingRegistry.RegisterClassReifier<{model.ClassName}>(jsClass.Id);");
         sb.AppendLine();
         sb.AppendLine("        return jsClass;");
         sb.AppendLine("    }");
@@ -175,7 +177,7 @@ public partial class JSBindingGenerator
             GenerateParameterUnmarshaling(sb, param, i, "                ");
         }
 
-        var paramList = string.Join(", ", model.Constructor.Parameters.Select(p => p.Name));
+        var paramList = string.Join(", ", model.Constructor.Parameters.Select(p => EscapeIdentifierIfNeeded(p.Name)));
         sb.AppendLine($"                var obj = new {model.ClassName}({paramList});");
         sb.AppendLine("                StoreInstance(instance, obj);");
         sb.AppendLine("            }");
@@ -322,7 +324,7 @@ public partial class JSBindingGenerator
         }
 
         var callPrefix = method.IsStatic ? $"{model.ClassName}." : "instance.";
-        var callArgs = string.Join(", ", method.Parameters.Select(p => p.Name));
+        var callArgs = string.Join(", ", method.Parameters.Select(p => EscapeIdentifierIfNeeded(p.Name)));
 
         if (method.IsAsync)
         {
@@ -553,31 +555,30 @@ public partial class JSBindingGenerator
                 sb.AppendLine();
         }
 
-        // Export enums as objects
         foreach (var enumRef in model.EnumReferences)
         {
             sb.AppendLine($"            using var {ToCamelCase(enumRef.SimpleName)}Obj = realm.NewObject();");
-            
+
             foreach (var value in enumRef.Values)
-            {
                 if (enumRef.IsFlags)
                 {
-                    // Flags enum - number values as readonly properties
-                    sb.AppendLine($"            using var {ToCamelCase(value.JsName)}Value = realm.NewNumber({value.Value});");
-                    sb.AppendLine($"            {ToCamelCase(enumRef.SimpleName)}Obj.SetReadOnlyProperty(\"{value.JsName}\", {ToCamelCase(value.JsName)}Value);");
+                    sb.AppendLine(
+                        $"            using var {ToCamelCase(value.JsName)}Value = realm.NewNumber({value.Value});");
+                    sb.AppendLine(
+                        $"            {ToCamelCase(enumRef.SimpleName)}Obj.SetReadOnlyProperty(\"{value.JsName}\", {ToCamelCase(value.JsName)}Value);");
                 }
                 else
                 {
-                    // Regular enum - string values as readonly properties
-                    sb.AppendLine($"            using var {ToCamelCase(value.JsName)}Value = realm.NewString(\"{value.Name}\");");
-                    sb.AppendLine($"            {ToCamelCase(enumRef.SimpleName)}Obj.SetReadOnlyProperty(\"{value.JsName}\", {ToCamelCase(value.JsName)}Value);");
+                    sb.AppendLine(
+                        $"            using var {ToCamelCase(value.JsName)}Value = realm.NewString(\"{value.Name}\");");
+                    sb.AppendLine(
+                        $"            {ToCamelCase(enumRef.SimpleName)}Obj.SetReadOnlyProperty(\"{value.JsName}\", {ToCamelCase(value.JsName)}Value);");
                 }
-            }
-            
-            // Freeze the enum object to make it completely immutable
+
             sb.AppendLine($"            {ToCamelCase(enumRef.SimpleName)}Obj.Freeze(realm);");
-            sb.AppendLine($"            init.SetExport(\"{enumRef.ExportName}\", {ToCamelCase(enumRef.SimpleName)}Obj);");
-            
+            sb.AppendLine(
+                $"            init.SetExport(\"{enumRef.ExportName}\", {ToCamelCase(enumRef.SimpleName)}Obj);");
+
             if (enumRef != model.EnumReferences.Last() || model.Values.Any() || model.Methods.Any())
                 sb.AppendLine();
         }
@@ -759,11 +760,9 @@ public partial class JSBindingGenerator
     private static void GenerateModuleMethodExport(StringBuilder sb, ModuleModel model, ModuleMethodModel method)
     {
         var requiredParams = method.Parameters.Count(p => !p.IsOptional);
+        var methodType = method.IsAsync ? "SetFunctionAsync" : "SetFunction";
 
-        sb.AppendLine(method.IsAsync
-            ? $"            init.SetFunction(\"{method.JsName}\", async (ctx, thisArg, args) =>"
-            : $"            init.SetFunction(\"{method.JsName}\", (ctx, thisArg, args) =>");
-
+        sb.AppendLine($"            init.{methodType}(\"{method.JsName}\", {(method.IsAsync ? "async " : "")}(ctx, thisArg, args) =>");
         sb.AppendLine("            {");
 
         if (requiredParams > 0)
@@ -783,7 +782,7 @@ public partial class JSBindingGenerator
             GenerateParameterUnmarshaling(sb, param, i, "                    ");
         }
 
-        var callArgs = string.Join(", ", method.Parameters.Select(p => p.Name));
+        var callArgs = string.Join(", ", method.Parameters.Select(p => EscapeIdentifierIfNeeded(p.Name)));
 
         if (method.IsAsync)
         {

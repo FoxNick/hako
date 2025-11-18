@@ -19,7 +19,7 @@ namespace HakoJS.SourceGeneration;
 /// }
 /// </code>
 /// </example>
-[AttributeUsage(AttributeTargets.Class)]
+[AttributeUsage(AttributeTargets.Class, Inherited = false)]
 public sealed class JSClassAttribute : Attribute
 {
     /// <summary>
@@ -40,7 +40,7 @@ public sealed class JSClassAttribute : Attribute
 /// public static async Task&lt;string&gt; FetchAsync(string url) { }
 /// </code>
 /// </example>
-[AttributeUsage(AttributeTargets.Method)]
+[AttributeUsage(AttributeTargets.Method, Inherited = true)]
 public sealed class JSMethodAttribute : Attribute
 {
     /// <summary>
@@ -66,7 +66,7 @@ public sealed class JSMethodAttribute : Attribute
 /// public int Age { get; set; } // Exposed as read-only in JS
 /// </code>
 /// </example>
-[AttributeUsage(AttributeTargets.Property)]
+[AttributeUsage(AttributeTargets.Property, Inherited = true)]
 public sealed class JSPropertyAttribute : Attribute
 {
     /// <summary>
@@ -113,7 +113,7 @@ public sealed class JSConstructorAttribute : Attribute
 /// public void InternalMethod() { }
 /// </code>
 /// </example>
-[AttributeUsage(AttributeTargets.Method | AttributeTargets.Property)]
+[AttributeUsage(AttributeTargets.Method | AttributeTargets.Property, Inherited = true)]
 public sealed class JSIgnoreAttribute : Attribute
 {
 }
@@ -141,7 +141,7 @@ public sealed class JSIgnoreAttribute : Attribute
 /// csharpConfig.OnEvent("test"); // Calls JS function
 /// </code>
 /// </example>
-[AttributeUsage(AttributeTargets.Class, Inherited = false)]
+[AttributeUsage(AttributeTargets.Class, Inherited = true)]
 public sealed class JSObjectAttribute : Attribute
 {
     /// <summary>
@@ -169,7 +169,7 @@ public sealed class JSObjectAttribute : Attribute
 /// // JavaScript: { api_key: "..." }
 /// </code>
 /// </example>
-[AttributeUsage(AttributeTargets.Parameter)]
+[AttributeUsage(AttributeTargets.Parameter, Inherited = true)]
 public sealed class JSPropertyNameAttribute : Attribute
 {
     public string Name { get; }

@@ -203,6 +203,12 @@ public sealed class JSValue(Realm realm, int handle, ValueLifecycle lifecycle = 
 
         try
         {
+
+            if (this.TryReify<T>(out var converted))
+            {
+                return CreateResult(converted!);
+            }
+            
             if (typeof(T) == typeof(string))
             {
                 return CreateResult(AsString());
