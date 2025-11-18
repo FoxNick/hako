@@ -489,6 +489,23 @@ public partial class JSBindingGenerator : IIncrementalGenerator
                 if (enumReferences.All(e => e.FullTypeName != fullTypeName))
                 {
                     var jsEnumName = GetJsEnumName(nestedType);
+
+                    var jsEnumAttr = nestedType.GetAttributes()
+                        .FirstOrDefault(a =>
+                            a.AttributeClass?.ToDisplayString() == "HakoJS.SourceGeneration.JSEnumAttribute");
+
+                    var casing = NameCasing.None;
+                    if (jsEnumAttr != null)
+                    {
+                        foreach (var arg in jsEnumAttr.NamedArguments)
+                        {
+                            if (arg.Key == "Casing" && arg.Value.Value != null)
+                            {
+                                casing = (NameCasing)(int)arg.Value.Value;
+                            }
+                        }
+                    }
+
                     var isFlags = nestedType.GetAttributes()
                         .Any(a => a.AttributeClass?.ToDisplayString() == "System.FlagsAttribute");
 
@@ -501,7 +518,7 @@ public partial class JSBindingGenerator : IIncrementalGenerator
                         enumValues.Add(new EnumValueModel
                         {
                             Name = member.Name,
-                            JsName = member.Name,
+                            JsName = ApplyCasing(member.Name, casing),
                             Value = member.ConstantValue ?? 0,
                             Documentation = ExtractXmlDocumentation(member)
                         });
@@ -1035,8 +1052,23 @@ public partial class JSBindingGenerator : IIncrementalGenerator
                 continue;
             }
 
+            var jsEnumAttr = enumType.GetAttributes()
+                .FirstOrDefault(a => a.AttributeClass?.ToDisplayString() == "HakoJS.SourceGeneration.JSEnumAttribute");
+
             var jsEnumName = GetJsEnumName(enumType);
             exportName ??= jsEnumName;
+
+            var casing = NameCasing.None;
+            if (jsEnumAttr != null)
+            {
+                foreach (var arg in jsEnumAttr.NamedArguments)
+                {
+                    if (arg.Key == "Casing" && arg.Value.Value != null)
+                    {
+                        casing = (NameCasing)(int)arg.Value.Value;
+                    }
+                }
+            }
 
             var isFlags = enumType.GetAttributes()
                 .Any(a => a.AttributeClass?.ToDisplayString() == "System.FlagsAttribute");
@@ -1050,7 +1082,7 @@ public partial class JSBindingGenerator : IIncrementalGenerator
                 values.Add(new EnumValueModel
                 {
                     Name = member.Name,
-                    JsName = member.Name,
+                    JsName = ApplyCasing(member.Name, casing),
                     Value = member.ConstantValue ?? 0,
                     Documentation = ExtractXmlDocumentation(member)
                 });
@@ -1779,7 +1811,7 @@ public partial class JSBindingGenerator : IIncrementalGenerator
         ITypeSymbol? underlyingType = null;
         if (type.IsNullableValueType() && type is INamedTypeSymbol { TypeArguments.Length: > 0 } namedType)
             underlyingType = namedType.TypeArguments[0];
-        
+
         var isEnum = false;
         var isFlags = false;
 
@@ -1792,7 +1824,7 @@ public partial class JSBindingGenerator : IIncrementalGenerator
                 isFlags = enumSymbol.GetAttributes()
                     .Any(a => a.AttributeClass?.ToDisplayString() == "System.FlagsAttribute");
         }
-        
+
         var isGenericDictionary = false;
         string? keyType = null;
         string? valueType = null;
@@ -1814,7 +1846,7 @@ public partial class JSBindingGenerator : IIncrementalGenerator
                     valueType = valueTypeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
                 }
         }
-        
+
         var isGenericCollection = false;
         string? itemType = null;
 

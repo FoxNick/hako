@@ -24,7 +24,22 @@ public partial class JSBindingGenerator
         if (enumSymbol.TypeKind != TypeKind.Enum)
             return new EnumResult(null, diagnostics.ToImmutable());
 
+        var jsEnumAttr = enumSymbol.GetAttributes()
+            .FirstOrDefault(a => a.AttributeClass?.ToDisplayString() == "HakoJS.SourceGeneration.JSEnumAttribute");
+
         var jsEnumName = GetJsEnumName(enumSymbol);
+        var casing = NameCasing.None;
+
+        if (jsEnumAttr != null)
+        {
+            foreach (var arg in jsEnumAttr.NamedArguments)
+            {
+                if (arg.Key == "Casing" && arg.Value.Value != null)
+                {
+                    casing = (NameCasing)(int)arg.Value.Value;
+                }
+            }
+        }
 
         var isFlags = enumSymbol.GetAttributes()
             .Any(a => a.AttributeClass?.ToDisplayString() == "System.FlagsAttribute");
@@ -38,7 +53,7 @@ public partial class JSBindingGenerator
             values.Add(new EnumValueModel
             {
                 Name = member.Name,
-                JsName = member.Name,
+                JsName = ApplyCasing(member.Name, casing),
                 Value = member.ConstantValue ?? 0,
                 Documentation = ExtractXmlDocumentation(member)
             });

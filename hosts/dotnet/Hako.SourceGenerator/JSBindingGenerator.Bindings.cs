@@ -820,4 +820,81 @@ public partial class JSBindingGenerator
     }
 
     #endregion
+    
+    #region Name Casing Helpers
+    
+    private enum NameCasing
+    {
+        None = 0,
+        Camel = 1,
+        Pascal = 2,
+        Snake = 3,
+        ScreamingSnake = 4,
+        Lower = 5
+    }
+
+    private static string ApplyCasing(string name, NameCasing casing)
+    {
+        return casing switch
+        {
+            NameCasing.Camel => ToCamelCase(name),
+            NameCasing.Pascal => ToPascalCase(name),
+            NameCasing.Snake => ToSnakeCase(name),
+            NameCasing.ScreamingSnake => ToScreamingSnakeCase(name),
+            NameCasing.Lower => name.ToLowerInvariant(),
+            _ => name
+        };
+    }
+
+    private static string ToSnakeCase(string str)
+    {
+        if (string.IsNullOrEmpty(str))
+            return str;
+
+        var sb = new StringBuilder();
+        sb.Append(char.ToLower(str[0]));
+
+        for (var i = 1; i < str.Length; i++)
+        {
+            var c = str[i];
+            if (char.IsUpper(c))
+            {
+                sb.Append('_');
+                sb.Append(char.ToLower(c));
+            }
+            else
+            {
+                sb.Append(c);
+            }
+        }
+
+        return sb.ToString();
+    }
+
+    private static string ToScreamingSnakeCase(string str)
+    {
+        if (string.IsNullOrEmpty(str))
+            return str;
+
+        var sb = new StringBuilder();
+        sb.Append(char.ToUpper(str[0]));
+
+        for (var i = 1; i < str.Length; i++)
+        {
+            var c = str[i];
+            if (char.IsUpper(c))
+            {
+                sb.Append('_');
+                sb.Append(c);
+            }
+            else
+            {
+                sb.Append(char.ToUpper(c));
+            }
+        }
+
+        return sb.ToString();
+    }
+
+    #endregion
 }
