@@ -126,6 +126,7 @@ public partial class JSBindingGenerator
             var param = method.Parameters[i];
             var argName = $"args[{i}]";
             var varName = param.Name;
+            var isAnyType = param.TypeInfo.SpecialType == SpecialType.System_Object;
 
             if (param.IsOptional)
             {
@@ -137,9 +138,13 @@ public partial class JSBindingGenerator
                 sb.AppendLine($"{indent}        if ({argName}.IsNullOrUndefined())");
                 sb.AppendLine(
                     $"{indent}            return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Parameter '{varName}' cannot be null or undefined\");");
-                sb.AppendLine($"{indent}        if (!{GetTypeCheck(param.TypeInfo, argName)})");
-                sb.AppendLine(
-                    $"{indent}            return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Parameter '{varName}' must be {GetTypeName(param.TypeInfo)}\");");
+                if (!isAnyType)
+                {
+                    sb.AppendLine($"{indent}        if (!{GetTypeCheck(param.TypeInfo, argName)})");
+                    sb.AppendLine(
+                        $"{indent}            return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Parameter '{varName}' must be {GetTypeName(param.TypeInfo)}\");");
+                }
+
                 sb.AppendLine($"{indent}        var {varName} = {GetStrictUnmarshalCode(param.TypeInfo, argName)};");
             }
         }
@@ -615,6 +620,7 @@ public partial class JSBindingGenerator
         var isRequired = !param.IsOptional;
         var propVarName = ToCamelCase(param.Name) + "Prop";
         var localVarName = EscapeIdentifierIfNeeded(ToCamelCase(param.Name));
+        var isAnyType = param.TypeInfo.SpecialType == SpecialType.System_Object;
 
         sb.AppendLine($"{indent}using var {propVarName} = jsValue.GetProperty(\"{param.JsName}\");");
 
@@ -626,10 +632,14 @@ public partial class JSBindingGenerator
                 if (!param.TypeInfo.IsValueType && !typeDeclaration.EndsWith("?"))
                     typeDeclaration += "?";
 
-                sb.AppendLine(
-                    $"{indent}if (!{propVarName}.IsNullOrUndefined() && !{GetTypeCheck(param.TypeInfo, propVarName)})");
-                sb.AppendLine(
-                    $"{indent}    throw new global::System.InvalidOperationException(\"Property '{param.Name}' must be {GetTypeName(param.TypeInfo)}\");");
+                if (!isAnyType)
+                {
+                    sb.AppendLine(
+                        $"{indent}if (!{propVarName}.IsNullOrUndefined() && !{GetTypeCheck(param.TypeInfo, propVarName)})");
+                    sb.AppendLine(
+                        $"{indent}    throw new global::System.InvalidOperationException(\"Property '{param.Name}' must be {GetTypeName(param.TypeInfo)}\");");
+                }
+
                 sb.AppendLine(
                     $"{indent}var {localVarName} = {propVarName}.IsNullOrUndefined() ? null : {GetStrictUnmarshalCode(param.TypeInfo, propVarName, "realm")};");
             }
@@ -638,9 +648,13 @@ public partial class JSBindingGenerator
                 sb.AppendLine($"{indent}if ({propVarName}.IsNullOrUndefined())");
                 sb.AppendLine(
                     $"{indent}    throw new global::System.InvalidOperationException(\"Property '{param.Name}' cannot be null or undefined\");");
-                sb.AppendLine($"{indent}if (!{GetTypeCheck(param.TypeInfo, propVarName)})");
-                sb.AppendLine(
-                    $"{indent}    throw new global::System.InvalidOperationException(\"Property '{param.Name}' must be {GetTypeName(param.TypeInfo)}\");");
+                if (!isAnyType)
+                {
+                    sb.AppendLine($"{indent}if (!{GetTypeCheck(param.TypeInfo, propVarName)})");
+                    sb.AppendLine(
+                        $"{indent}    throw new global::System.InvalidOperationException(\"Property '{param.Name}' must be {GetTypeName(param.TypeInfo)}\");");
+                }
+
                 sb.AppendLine(
                     $"{indent}var {localVarName} = {GetStrictUnmarshalCode(param.TypeInfo, propVarName, "realm")};");
             }
@@ -660,9 +674,13 @@ public partial class JSBindingGenerator
             sb.AppendLine($"{indent}}}");
             sb.AppendLine($"{indent}else");
             sb.AppendLine($"{indent}{{");
-            sb.AppendLine($"{indent}    if (!{GetTypeCheck(param.TypeInfo, propVarName)})");
-            sb.AppendLine(
-                $"{indent}        throw new global::System.InvalidOperationException(\"Property '{param.Name}' must be {GetTypeName(param.TypeInfo)}\");");
+            if (!isAnyType)
+            {
+                sb.AppendLine($"{indent}    if (!{GetTypeCheck(param.TypeInfo, propVarName)})");
+                sb.AppendLine(
+                    $"{indent}        throw new global::System.InvalidOperationException(\"Property '{param.Name}' must be {GetTypeName(param.TypeInfo)}\");");
+            }
+
             sb.AppendLine(
                 $"{indent}    {localVarName} = {GetStrictUnmarshalCode(param.TypeInfo, propVarName, "realm")};");
             sb.AppendLine($"{indent}}}");
@@ -693,8 +711,8 @@ public partial class JSBindingGenerator
         var isRequired = !param.IsOptional;
         var type = param.TypeInfo;
         var paramName = EscapeIdentifierIfNeeded(param.Name);
+        var isAnyType = type.SpecialType == SpecialType.System_Object;
 
-        // Handle delegates specially
         if (param.IsDelegate && param.DelegateInfo != null)
         {
             var typeDeclaration = type.FullName;
@@ -711,7 +729,6 @@ public partial class JSBindingGenerator
                     $"{indent}    return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Parameter '{param.Name}' must be a function\");");
                 sb.AppendLine();
 
-                // Generate delegate wrapper inline
                 GenerateDelegateParameterWrapper(sb, param, argName, paramName, indent, false);
             }
             else
@@ -724,7 +741,6 @@ public partial class JSBindingGenerator
                     $"{indent}        return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Parameter '{param.Name}' must be a function\");");
                 sb.AppendLine();
 
-                // Generate delegate wrapper inline
                 GenerateDelegateParameterWrapper(sb, param, argName, paramName, indent + "    ", true);
 
                 sb.AppendLine($"{indent}}}");
@@ -737,7 +753,6 @@ public partial class JSBindingGenerator
             return;
         }
 
-        // Handle nullable value types (e.g., int?)
         if (type.UnderlyingType != null)
         {
             var underlyingTypeInfo = CreateTypeInfo(type.UnderlyingType);
@@ -745,9 +760,13 @@ public partial class JSBindingGenerator
             if (isRequired)
             {
                 sb.AppendLine($"{indent}var arg{index}IsNull = {argName}.IsNullOrUndefined();");
-                sb.AppendLine($"{indent}if (!arg{index}IsNull && !{GetTypeCheck(underlyingTypeInfo, argName)})");
-                sb.AppendLine(
-                    $"{indent}    return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Parameter '{param.Name}' must be {GetTypeName(underlyingTypeInfo)}\");");
+                if (!isAnyType)
+                {
+                    sb.AppendLine($"{indent}if (!arg{index}IsNull && !{GetTypeCheck(underlyingTypeInfo, argName)})");
+                    sb.AppendLine(
+                        $"{indent}    return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Parameter '{param.Name}' must be {GetTypeName(underlyingTypeInfo)}\");");
+                }
+
                 sb.AppendLine(
                     $"{indent}var {paramName} = arg{index}IsNull ? null : ({type.FullName})({GetStrictUnmarshalCode(underlyingTypeInfo, argName)});");
             }
@@ -758,9 +777,14 @@ public partial class JSBindingGenerator
                 sb.AppendLine($"{indent}if (args.Length > {index})");
                 sb.AppendLine($"{indent}{{");
                 sb.AppendLine($"{indent}    var arg{index}IsNull = {argName}.IsNullOrUndefined();");
-                sb.AppendLine($"{indent}    if (!arg{index}IsNull && !{GetTypeCheck(underlyingTypeInfo, argName)})");
-                sb.AppendLine(
-                    $"{indent}        return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Parameter '{param.Name}' must be {GetTypeName(underlyingTypeInfo)}\");");
+                if (!isAnyType)
+                {
+                    sb.AppendLine(
+                        $"{indent}    if (!arg{index}IsNull && !{GetTypeCheck(underlyingTypeInfo, argName)})");
+                    sb.AppendLine(
+                        $"{indent}        return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Parameter '{param.Name}' must be {GetTypeName(underlyingTypeInfo)}\");");
+                }
+
                 sb.AppendLine(
                     $"{indent}    {paramName} = arg{index}IsNull ? null : ({type.FullName})({GetStrictUnmarshalCode(underlyingTypeInfo, argName)});");
                 sb.AppendLine($"{indent}}}");
@@ -775,9 +799,13 @@ public partial class JSBindingGenerator
             if (type.IsNullable)
             {
                 sb.AppendLine($"{indent}var arg{index}IsNull = {argName}.IsNullOrUndefined();");
-                sb.AppendLine($"{indent}if (!arg{index}IsNull && !{GetTypeCheck(type, argName)})");
-                sb.AppendLine(
-                    $"{indent}    return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Parameter '{param.Name}' must be {GetTypeName(type)}\");");
+                if (!isAnyType)
+                {
+                    sb.AppendLine($"{indent}if (!arg{index}IsNull && !{GetTypeCheck(type, argName)})");
+                    sb.AppendLine(
+                        $"{indent}    return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Parameter '{param.Name}' must be {GetTypeName(type)}\");");
+                }
+
                 sb.AppendLine(
                     $"{indent}var {paramName} = arg{index}IsNull ? null : {GetStrictUnmarshalCode(type, argName)};");
             }
@@ -786,9 +814,13 @@ public partial class JSBindingGenerator
                 sb.AppendLine($"{indent}if ({argName}.IsNullOrUndefined())");
                 sb.AppendLine(
                     $"{indent}    return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Parameter '{param.Name}' cannot be null or undefined\");");
-                sb.AppendLine($"{indent}if (!{GetTypeCheck(type, argName)})");
-                sb.AppendLine(
-                    $"{indent}    return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Parameter '{param.Name}' must be {GetTypeName(type)}\");");
+                if (!isAnyType)
+                {
+                    sb.AppendLine($"{indent}if (!{GetTypeCheck(type, argName)})");
+                    sb.AppendLine(
+                        $"{indent}    return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Parameter '{param.Name}' must be {GetTypeName(type)}\");");
+                }
+
                 sb.AppendLine($"{indent}var {paramName} = {GetStrictUnmarshalCode(type, argName)};");
             }
         }
@@ -796,7 +828,6 @@ public partial class JSBindingGenerator
         {
             var defaultExpr = param.DefaultValue ?? GetDefaultValueForType(type);
 
-            // Add nullable marker for optional reference types
             var typeDeclaration = type.FullName;
             if (!type.IsValueType && !typeDeclaration.EndsWith("?"))
                 typeDeclaration += "?";
@@ -807,9 +838,13 @@ public partial class JSBindingGenerator
                 sb.AppendLine($"{indent}if (args.Length > {index})");
                 sb.AppendLine($"{indent}{{");
                 sb.AppendLine($"{indent}    var arg{index}IsNull = {argName}.IsNullOrUndefined();");
-                sb.AppendLine($"{indent}    if (!arg{index}IsNull && !{GetTypeCheck(type, argName)})");
-                sb.AppendLine(
-                    $"{indent}        return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Parameter '{param.Name}' must be {GetTypeName(type)}\");");
+                if (!isAnyType)
+                {
+                    sb.AppendLine($"{indent}    if (!arg{index}IsNull && !{GetTypeCheck(type, argName)})");
+                    sb.AppendLine(
+                        $"{indent}        return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Parameter '{param.Name}' must be {GetTypeName(type)}\");");
+                }
+
                 sb.AppendLine(
                     $"{indent}    {paramName} = arg{index}IsNull ? null : {GetStrictUnmarshalCode(type, argName)};");
                 sb.AppendLine($"{indent}}}");
@@ -826,9 +861,13 @@ public partial class JSBindingGenerator
                 sb.AppendLine($"{indent}    if ({argName}.IsNullOrUndefined())");
                 sb.AppendLine(
                     $"{indent}        return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Parameter '{param.Name}' cannot be null or undefined\");");
-                sb.AppendLine($"{indent}    if (!{GetTypeCheck(type, argName)})");
-                sb.AppendLine(
-                    $"{indent}        return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Parameter '{param.Name}' must be {GetTypeName(type)}\");");
+                if (!isAnyType)
+                {
+                    sb.AppendLine($"{indent}    if (!{GetTypeCheck(type, argName)})");
+                    sb.AppendLine(
+                        $"{indent}        return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Parameter '{param.Name}' must be {GetTypeName(type)}\");");
+                }
+
                 sb.AppendLine($"{indent}    {paramName} = {GetStrictUnmarshalCode(type, argName)};");
                 sb.AppendLine($"{indent}}}");
                 sb.AppendLine($"{indent}else");
@@ -958,21 +997,31 @@ public partial class JSBindingGenerator
     private static void GenerateValueUnmarshaling(StringBuilder sb, TypeInfo type, string varName, string jsValueName,
         string indent)
     {
+        var isAnyType = type.SpecialType == SpecialType.System_Object;
+
         if (type.UnderlyingType != null)
         {
             var underlyingTypeInfo = CreateTypeInfo(type.UnderlyingType);
-            sb.AppendLine(
-                $"{indent}if (!{jsValueName}.IsNullOrUndefined() && !{GetTypeCheck(underlyingTypeInfo, jsValueName)})");
-            sb.AppendLine(
-                $"{indent}    return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Value '{varName}' must be {GetTypeName(underlyingTypeInfo)}\");");
+            if (!isAnyType)
+            {
+                sb.AppendLine(
+                    $"{indent}if (!{jsValueName}.IsNullOrUndefined() && !{GetTypeCheck(underlyingTypeInfo, jsValueName)})");
+                sb.AppendLine(
+                    $"{indent}    return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Value '{varName}' must be {GetTypeName(underlyingTypeInfo)}\");");
+            }
+
             sb.AppendLine(
                 $"{indent}var {varName} = {jsValueName}.IsNullOrUndefined() ? null : ({type.FullName})({GetStrictUnmarshalCode(underlyingTypeInfo, jsValueName)});");
         }
         else if (type.IsNullable)
         {
-            sb.AppendLine($"{indent}if (!{jsValueName}.IsNullOrUndefined() && !{GetTypeCheck(type, jsValueName)})");
-            sb.AppendLine(
-                $"{indent}    return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Value '{varName}' must be {GetTypeName(type)}\");");
+            if (!isAnyType)
+            {
+                sb.AppendLine($"{indent}if (!{jsValueName}.IsNullOrUndefined() && !{GetTypeCheck(type, jsValueName)})");
+                sb.AppendLine(
+                    $"{indent}    return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Value '{varName}' must be {GetTypeName(type)}\");");
+            }
+
             sb.AppendLine(
                 $"{indent}var {varName} = {jsValueName}.IsNullOrUndefined() ? null : {GetStrictUnmarshalCode(type, jsValueName)};");
         }
@@ -981,9 +1030,13 @@ public partial class JSBindingGenerator
             sb.AppendLine($"{indent}if ({jsValueName}.IsNullOrUndefined())");
             sb.AppendLine(
                 $"{indent}    return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Value '{varName}' cannot be null or undefined\");");
-            sb.AppendLine($"{indent}if (!{GetTypeCheck(type, jsValueName)})");
-            sb.AppendLine(
-                $"{indent}    return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Value '{varName}' must be {GetTypeName(type)}\");");
+            if (!isAnyType)
+            {
+                sb.AppendLine($"{indent}if (!{GetTypeCheck(type, jsValueName)})");
+                sb.AppendLine(
+                    $"{indent}    return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Value '{varName}' must be {GetTypeName(type)}\");");
+            }
+
             sb.AppendLine($"{indent}var {varName} = {GetStrictUnmarshalCode(type, jsValueName)};");
         }
     }
