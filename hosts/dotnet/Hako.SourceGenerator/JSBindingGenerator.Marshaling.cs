@@ -92,7 +92,7 @@ public partial class JSBindingGenerator
     {
         if (typeInfo.IsArray || typeInfo.IsGenericCollection || typeInfo.IsGenericDictionary)
             return true;
-        
+
         return typeInfo.SpecialType switch
         {
             SpecialType.System_Boolean => false,
@@ -506,24 +506,43 @@ public partial class JSBindingGenerator
             return $"{typeName} {p.Name}";
         }));
 
-        var paramTypes = string.Join(", ", delegateInfo.Parameters.Select(p => p.TypeInfo.FullName));
+        // Check if this is a named delegate type (not Func/Action)
+        var isNamedDelegate = !param.TypeInfo.FullName.Contains("System.Func") &&
+                              !param.TypeInfo.FullName.Contains("System.Action");
 
         string delegateType;
-        if (delegateInfo.IsVoid)
+        if (isNamedDelegate)
         {
-            delegateType = paramTypes.Length > 0
-                ? $"global::System.Action<{paramTypes}>"
-                : "global::System.Action";
+            // Use the actual delegate type name
+            delegateType = param.TypeInfo.FullName;
         }
         else
         {
-            var returnTypeStr = delegateInfo.IsAsync
-                ? $"global::System.Threading.Tasks.Task<{delegateInfo.ReturnType.FullName}>"
-                : delegateInfo.ReturnType.FullName;
+            // Generate Func/Action type
+            var paramTypes = string.Join(", ", delegateInfo.Parameters.Select(p =>
+            {
+                var typeName = p.TypeInfo.FullName;
+                if (!p.TypeInfo.IsValueType && p.TypeInfo.IsNullable && !typeName.EndsWith("?"))
+                    typeName += "?";
+                return typeName;
+            }));
 
-            delegateType = paramTypes.Length > 0
-                ? $"global::System.Func<{paramTypes}, {returnTypeStr}>"
-                : $"global::System.Func<{returnTypeStr}>";
+            if (delegateInfo.IsVoid)
+            {
+                delegateType = paramTypes.Length > 0
+                    ? $"global::System.Action<{paramTypes}>"
+                    : "global::System.Action";
+            }
+            else
+            {
+                var returnTypeStr = delegateInfo.IsAsync
+                    ? $"global::System.Threading.Tasks.Task<{delegateInfo.ReturnType.FullName}>"
+                    : delegateInfo.ReturnType.FullName;
+
+                delegateType = paramTypes.Length > 0
+                    ? $"global::System.Func<{paramTypes}, {returnTypeStr}>"
+                    : $"global::System.Func<{returnTypeStr}>";
+            }
         }
 
         if (delegateInfo.IsAsync)
@@ -603,6 +622,10 @@ public partial class JSBindingGenerator
         {
             if (param.TypeInfo.IsNullable)
             {
+                var typeDeclaration = param.TypeInfo.FullName;
+                if (!param.TypeInfo.IsValueType && !typeDeclaration.EndsWith("?"))
+                    typeDeclaration += "?";
+
                 sb.AppendLine(
                     $"{indent}if (!{propVarName}.IsNullOrUndefined() && !{GetTypeCheck(param.TypeInfo, propVarName)})");
                 sb.AppendLine(
@@ -624,7 +647,12 @@ public partial class JSBindingGenerator
         }
         else
         {
-            sb.AppendLine($"{indent}{param.TypeInfo.FullName} {localVarName};");
+            var typeDeclaration = param.TypeInfo.FullName;
+
+            if (!param.TypeInfo.IsValueType && !typeDeclaration.EndsWith("?"))
+                typeDeclaration += "?";
+
+            sb.AppendLine($"{indent}{typeDeclaration} {localVarName};");
             sb.AppendLine($"{indent}if ({propVarName}.IsNullOrUndefined())");
             sb.AppendLine($"{indent}{{");
             sb.AppendLine(
@@ -826,11 +854,50 @@ public partial class JSBindingGenerator
             return $"{typeName} {p.Name}";
         }));
 
+        // Check if this is a named delegate type (not Func/Action)
+        var isNamedDelegate = !param.TypeInfo.FullName.Contains("System.Func") &&
+                              !param.TypeInfo.FullName.Contains("System.Action");
+
+        string delegateType;
+        if (isNamedDelegate)
+        {
+            // Use the actual delegate type name
+            delegateType = param.TypeInfo.FullName;
+        }
+        else
+        {
+            // Generate Func/Action type
+            var paramTypes = string.Join(", ", delegateInfo.Parameters.Select(p =>
+            {
+                var typeName = p.TypeInfo.FullName;
+                if (!p.TypeInfo.IsValueType && p.TypeInfo.IsNullable && !typeName.EndsWith("?"))
+                    typeName += "?";
+                return typeName;
+            }));
+
+            if (delegateInfo.IsVoid)
+            {
+                delegateType = paramTypes.Length > 0
+                    ? $"global::System.Action<{paramTypes}>"
+                    : "global::System.Action";
+            }
+            else
+            {
+                var returnTypeStr = delegateInfo.IsAsync
+                    ? $"global::System.Threading.Tasks.Task<{delegateInfo.ReturnType.FullName}>"
+                    : delegateInfo.ReturnType.FullName;
+
+                delegateType = paramTypes.Length > 0
+                    ? $"global::System.Func<{paramTypes}, {returnTypeStr}>"
+                    : $"global::System.Func<{returnTypeStr}>";
+            }
+        }
+
         var assignmentPrefix = isOptionalAssignment ? $"{indent}{paramName} = " : $"{indent}var {paramName} = ";
 
         if (delegateInfo.IsAsync)
         {
-            sb.AppendLine($"{assignmentPrefix}async ({delegateParams}) =>");
+            sb.AppendLine($"{assignmentPrefix}new {delegateType}(async ({delegateParams}) =>");
             sb.AppendLine($"{indent}{{");
 
             // Build arguments array for Invoke
@@ -855,11 +922,11 @@ public partial class JSBindingGenerator
                     sb.AppendLine($"{indent}    await {jsValueName}.InvokeAsync();");
             }
 
-            sb.AppendLine($"{indent}}};");
+            sb.AppendLine($"{indent}}});");
         }
         else
         {
-            sb.AppendLine($"{assignmentPrefix}({delegateParams}) =>");
+            sb.AppendLine($"{assignmentPrefix}new {delegateType}(({delegateParams}) =>");
             sb.AppendLine($"{indent}{{");
 
             // Build arguments array for Invoke
@@ -884,7 +951,7 @@ public partial class JSBindingGenerator
                     sb.AppendLine($"{indent}    {jsValueName}.Invoke();");
             }
 
-            sb.AppendLine($"{indent}}};");
+            sb.AppendLine($"{indent}}});");
         }
     }
 
@@ -1039,7 +1106,7 @@ public partial class JSBindingGenerator
         {
             case SpecialType.System_String:
                 return $"{jsValueName}.AsString()";
-            case SpecialType.System_Char: 
+            case SpecialType.System_Char:
                 return $"{jsValueName}.AsString().FirstOrDefault()";
             case SpecialType.System_Int32:
                 return $"(int){jsValueName}.AsNumber()";
@@ -1063,7 +1130,7 @@ public partial class JSBindingGenerator
                 return $"(ulong){jsValueName}.AsNumber()";
             case SpecialType.System_UInt16:
                 return $"(ushort){jsValueName}.AsNumber()";
-            
+
             case SpecialType.System_DateTime:
                 return $"{jsValueName}.AsDateTime()";
         }
@@ -1082,8 +1149,8 @@ public partial class JSBindingGenerator
         if (type is { IsArray: true, ElementType: not null })
         {
             var elementTypeName = type.ElementType.Replace("global::", "");
-            
-            if (IsPrimitiveTypeName(type.ElementType) || 
+
+            if (IsPrimitiveTypeName(type.ElementType) ||
                 elementTypeName is "System.Object" or "object")
                 return $"{jsValueName}.ToArray<{type.ElementType}>()";
 
@@ -1313,8 +1380,8 @@ public partial class JSBindingGenerator
         if (type is { IsArray: true, ElementType: not null })
         {
             var elementTypeName = type.ElementType.Replace("global::", "");
-            
-            if (IsPrimitiveTypeName(type.ElementType) || 
+
+            if (IsPrimitiveTypeName(type.ElementType) ||
                 elementTypeName is "System.Object" or "object")
                 return type.IsNullable
                     ? $"({valueName} == null ? {ctxName}.Null() : {valueName}.ToJSArray({ctxName}))"
