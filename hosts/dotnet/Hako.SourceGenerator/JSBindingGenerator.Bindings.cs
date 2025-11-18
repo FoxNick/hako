@@ -565,14 +565,14 @@ public partial class JSBindingGenerator
                     sb.AppendLine(
                         $"            using var {ToCamelCase(value.JsName)}Value = realm.NewNumber({value.Value});");
                     sb.AppendLine(
-                        $"            {ToCamelCase(enumRef.SimpleName)}Obj.SetReadOnlyProperty(\"{value.JsName}\", {ToCamelCase(value.JsName)}Value);");
+                        $"            {ToCamelCase(enumRef.SimpleName)}Obj.SetReadOnlyProperty(\"{value.GetFormattedPropertyName()}\", {ToCamelCase(value.JsName)}Value);");
                 }
                 else
                 {
                     sb.AppendLine(
-                        $"            using var {ToCamelCase(value.JsName)}Value = realm.NewString(\"{value.Name}\");");
+                        $"            using var {ToCamelCase(value.JsName)}Value = realm.NewString(\"{value.GetFormattedValue()}\");");
                     sb.AppendLine(
-                        $"            {ToCamelCase(enumRef.SimpleName)}Obj.SetReadOnlyProperty(\"{value.JsName}\", {ToCamelCase(value.JsName)}Value);");
+                        $"            {ToCamelCase(enumRef.SimpleName)}Obj.SetReadOnlyProperty(\"{value.GetFormattedPropertyName()}\", {ToCamelCase(value.JsName)}Value);");
                 }
 
             sb.AppendLine($"            {ToCamelCase(enumRef.SimpleName)}Obj.Freeze(realm);");

@@ -299,6 +299,13 @@ public partial class JSBindingGenerator
         public string JsName { get; set; } = "";
         public object Value { get; set; } = 0;
         public string? Documentation { get; set; }
+        public NameCasing NameCasing { get; set; }
+        
+        public ValueCasing  ValueCasing { get; set; }
+
+        public string GetFormattedPropertyName() => ApplyCasing(JsName, NameCasing);
+        
+        public string GetFormattedValue() => ApplyValueCasing(Name, ValueCasing);
     }
 
     private class ModuleEnumReference

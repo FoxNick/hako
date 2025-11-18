@@ -197,7 +197,6 @@ public partial class JSBindingGenerator
         if (!string.IsNullOrWhiteSpace(documentation))
             sb.Append(FormatTsDoc(documentation, indent: 0));
 
-        // export const <Name>: { readonly ... };
         sb.AppendLine($"export const {enumName}: {{");
 
         foreach (var value in values)
@@ -205,18 +204,14 @@ public partial class JSBindingGenerator
             if (!string.IsNullOrWhiteSpace(value.Documentation))
                 sb.Append(FormatTsDoc(value.Documentation, indent: 2));
 
-            // In ambient context we only declare the *type* of the const's properties.
-            // Flags -> numeric literal; otherwise -> string literal of the name.
             var typeLiteral = isFlags
                 ? value.Value.ToString()
-                : $"\"{EscapeTsString(value.Name)}\"";
+                : $"\"{EscapeTsString(value.GetFormattedValue())}\"";
 
-            sb.AppendLine($"  readonly {value.JsName}: {typeLiteral};");
+            sb.AppendLine($"  readonly {value.GetFormattedPropertyName()}: {typeLiteral};");
         }
 
         sb.AppendLine("};");
-
-        // Also export a union type from the declared const shape
         sb.AppendLine($"export type {enumName} = typeof {enumName}[keyof typeof {enumName}];");
 
         return sb.ToString();

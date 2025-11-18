@@ -54,16 +54,16 @@ public partial class JSBindingGenerator
         {
             if (member.IsImplicitlyDeclared || !member.HasConstantValue)
                 continue;
-
-            var propertyName = ApplyCasing(member.Name, casing);
-            var valueName = ApplyValueCasing(member.Name, valueCasing);
+            
 
             values.Add(new EnumValueModel
             {
-                Name = valueName,
-                JsName = propertyName,
+                Name = member.Name,
+                JsName = member.Name,
                 Value = member.ConstantValue ?? 0,
-                Documentation = ExtractXmlDocumentation(member)
+                Documentation = ExtractXmlDocumentation(member),
+                NameCasing = casing,
+                ValueCasing = valueCasing
             });
         }
 
