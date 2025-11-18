@@ -762,7 +762,8 @@ public partial class JSBindingGenerator
         var requiredParams = method.Parameters.Count(p => !p.IsOptional);
         var methodType = method.IsAsync ? "SetFunctionAsync" : "SetFunction";
 
-        sb.AppendLine($"            init.{methodType}(\"{method.JsName}\", {(method.IsAsync ? "async " : "")}(ctx, thisArg, args) =>");
+        sb.AppendLine(
+            $"            init.{methodType}(\"{method.JsName}\", {(method.IsAsync ? "async " : "")}(ctx, thisArg, args) =>");
         sb.AppendLine("            {");
 
         if (requiredParams > 0)
@@ -820,9 +821,9 @@ public partial class JSBindingGenerator
     }
 
     #endregion
-    
+
     #region Name Casing Helpers
-    
+
     private enum NameCasing
     {
         None = 0,
@@ -831,6 +832,13 @@ public partial class JSBindingGenerator
         Snake = 3,
         ScreamingSnake = 4,
         Lower = 5
+    }
+
+    private enum ValueCasing
+    {
+        Original = 0,
+        Lower = 1,
+        Upper = 2
     }
 
     private static string ApplyCasing(string name, NameCasing casing)
@@ -842,6 +850,16 @@ public partial class JSBindingGenerator
             NameCasing.Snake => ToSnakeCase(name),
             NameCasing.ScreamingSnake => ToScreamingSnakeCase(name),
             NameCasing.Lower => name.ToLowerInvariant(),
+            _ => name
+        };
+    }
+
+    private static string ApplyValueCasing(string name, ValueCasing casing)
+    {
+        return casing switch
+        {
+            ValueCasing.Lower => name.ToLowerInvariant(),
+            ValueCasing.Upper => name.ToUpperInvariant(),
             _ => name
         };
     }

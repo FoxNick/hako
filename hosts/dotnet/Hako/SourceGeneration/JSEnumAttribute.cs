@@ -42,6 +42,30 @@ public enum NameCasing
 }
 
 /// <summary>
+/// Defines simple casing transformations for enum values.
+/// </summary>
+public enum ValueCasing
+{
+    /// <summary>
+    /// Keep the original C# value name unchanged.
+    /// Example: MyValue stays MyValue
+    /// </summary>
+    Original = 0,
+    
+    /// <summary>
+    /// Convert to lowercase.
+    /// Example: MyValue becomes myvalue
+    /// </summary>
+    Lower,
+    
+    /// <summary>
+    /// Convert to uppercase.
+    /// Example: MyValue becomes MYVALUE
+    /// </summary>
+    Upper
+}
+
+/// <summary>
 /// Marks an enum for JavaScript marshaling.
 /// Regular enums marshal as strings, [Flags] enums marshal as numbers.
 /// </summary>
@@ -58,4 +82,10 @@ public class JSEnumAttribute : Attribute
     /// Default is None (keeps original C# naming).
     /// </summary>
     public NameCasing Casing { get; set; } = NameCasing.None;
+    
+    /// <summary>
+    /// Controls the casing style of enum values when marshaling to JavaScript.
+    /// Default is Original (keeps original C# value names).
+    /// </summary>
+    public ValueCasing ValueCasing { get; set; } = ValueCasing.Original;
 }

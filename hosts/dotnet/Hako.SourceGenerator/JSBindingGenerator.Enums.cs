@@ -29,6 +29,7 @@ public partial class JSBindingGenerator
 
         var jsEnumName = GetJsEnumName(enumSymbol);
         var casing = NameCasing.None;
+        var valueCasing = ValueCasing.Original;
 
         if (jsEnumAttr != null)
         {
@@ -37,6 +38,10 @@ public partial class JSBindingGenerator
                 if (arg.Key == "Casing" && arg.Value.Value != null)
                 {
                     casing = (NameCasing)(int)arg.Value.Value;
+                }
+                else if (arg.Key == "ValueCasing" && arg.Value.Value != null)
+                {
+                    valueCasing = (ValueCasing)(int)arg.Value.Value;
                 }
             }
         }
@@ -50,10 +55,13 @@ public partial class JSBindingGenerator
             if (member.IsImplicitlyDeclared || !member.HasConstantValue)
                 continue;
 
+            var propertyName = ApplyCasing(member.Name, casing);
+            var valueName = ApplyValueCasing(member.Name, valueCasing);
+
             values.Add(new EnumValueModel
             {
-                Name = member.Name,
-                JsName = ApplyCasing(member.Name, casing),
+                Name = valueName,
+                JsName = propertyName,
                 Value = member.ConstantValue ?? 0,
                 Documentation = ExtractXmlDocumentation(member)
             });

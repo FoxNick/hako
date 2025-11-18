@@ -495,6 +495,7 @@ public partial class JSBindingGenerator : IIncrementalGenerator
                             a.AttributeClass?.ToDisplayString() == "HakoJS.SourceGeneration.JSEnumAttribute");
 
                     var casing = NameCasing.None;
+                    var valueCasing = ValueCasing.Original;
                     if (jsEnumAttr != null)
                     {
                         foreach (var arg in jsEnumAttr.NamedArguments)
@@ -502,6 +503,10 @@ public partial class JSBindingGenerator : IIncrementalGenerator
                             if (arg.Key == "Casing" && arg.Value.Value != null)
                             {
                                 casing = (NameCasing)(int)arg.Value.Value;
+                            }
+                            else if (arg.Key == "ValueCasing" && arg.Value.Value != null)
+                            {
+                                valueCasing = (ValueCasing)(int)arg.Value.Value;
                             }
                         }
                     }
@@ -515,10 +520,13 @@ public partial class JSBindingGenerator : IIncrementalGenerator
                         if (member.IsImplicitlyDeclared || !member.HasConstantValue)
                             continue;
 
+                        var propertyName = ApplyCasing(member.Name, casing);
+                        var valueName = ApplyValueCasing(member.Name, valueCasing);
+
                         enumValues.Add(new EnumValueModel
                         {
-                            Name = member.Name,
-                            JsName = ApplyCasing(member.Name, casing),
+                            Name = valueName,
+                            JsName = propertyName,
                             Value = member.ConstantValue ?? 0,
                             Documentation = ExtractXmlDocumentation(member)
                         });
@@ -1059,6 +1067,7 @@ public partial class JSBindingGenerator : IIncrementalGenerator
             exportName ??= jsEnumName;
 
             var casing = NameCasing.None;
+            var valueCasing = ValueCasing.Original;
             if (jsEnumAttr != null)
             {
                 foreach (var arg in jsEnumAttr.NamedArguments)
@@ -1066,6 +1075,10 @@ public partial class JSBindingGenerator : IIncrementalGenerator
                     if (arg.Key == "Casing" && arg.Value.Value != null)
                     {
                         casing = (NameCasing)(int)arg.Value.Value;
+                    }
+                    else if (arg.Key == "ValueCasing" && arg.Value.Value != null)
+                    {
+                        valueCasing = (ValueCasing)(int)arg.Value.Value;
                     }
                 }
             }
@@ -1079,10 +1092,13 @@ public partial class JSBindingGenerator : IIncrementalGenerator
                 if (member.IsImplicitlyDeclared || !member.HasConstantValue)
                     continue;
 
+                var propertyName = ApplyCasing(member.Name, casing);
+                var valueName = ApplyValueCasing(member.Name, valueCasing);
+
                 values.Add(new EnumValueModel
                 {
-                    Name = member.Name,
-                    JsName = ApplyCasing(member.Name, casing),
+                    Name = valueName,
+                    JsName = propertyName,
                     Value = member.ConstantValue ?? 0,
                     Documentation = ExtractXmlDocumentation(member)
                 });
