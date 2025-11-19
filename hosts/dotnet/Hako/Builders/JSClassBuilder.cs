@@ -105,7 +105,7 @@ public sealed class JSClassBuilder
     /// </remarks>
     public JSClassBuilder SetConstructor(JSAction constructor)
     {
-        if (constructor == null) throw new ArgumentNullException(nameof(constructor));
+        ArgumentNullException.ThrowIfNull(constructor);
 
         _constructor = (ctx, instance, args, newTarget) =>
         {
@@ -173,7 +173,7 @@ public sealed class JSClassBuilder
     /// <exception cref="ArgumentNullException"><paramref name="name"/> or <paramref name="method"/> is <c>null</c>.</exception>
     public JSClassBuilder AddMethod(string name, JSAction method)
     {
-        if (method == null) throw new ArgumentNullException(nameof(method));
+        ArgumentNullException.ThrowIfNull(method);
 
         _methods[name] = (ctx, thisArg, args) =>
         {
@@ -199,7 +199,7 @@ public sealed class JSClassBuilder
     /// </remarks>
     public JSClassBuilder AddMethodAsync(string name, JSAsyncFunction method)
     {
-        if (method == null) throw new ArgumentNullException(nameof(method));
+        ArgumentNullException.ThrowIfNull(method);
 
         _methods[name] = (ctx, thisArg, args) =>
         {
@@ -240,7 +240,7 @@ public sealed class JSClassBuilder
     /// <exception cref="ArgumentNullException"><paramref name="name"/> or <paramref name="method"/> is <c>null</c>.</exception>
     public JSClassBuilder AddMethodAsync(string name, JSAsyncAction method)
     {
-        if (method == null) throw new ArgumentNullException(nameof(method));
+        ArgumentNullException.ThrowIfNull(method);
 
         _methods[name] = (ctx, thisArg, args) =>
         {
@@ -302,7 +302,7 @@ public sealed class JSClassBuilder
     /// <exception cref="ArgumentNullException"><paramref name="name"/> or <paramref name="method"/> is <c>null</c>.</exception>
     public JSClassBuilder AddStaticMethod(string name, JSAction method)
     {
-        if (method == null) throw new ArgumentNullException(nameof(method));
+        ArgumentNullException.ThrowIfNull(method);
 
         _staticMethods[name] = (ctx, thisArg, args) =>
         {
@@ -321,7 +321,7 @@ public sealed class JSClassBuilder
     /// <exception cref="ArgumentNullException"><paramref name="name"/> or <paramref name="method"/> is <c>null</c>.</exception>
     public JSClassBuilder AddStaticMethodAsync(string name, JSAsyncFunction method)
     {
-        if (method == null) throw new ArgumentNullException(nameof(method));
+        ArgumentNullException.ThrowIfNull(method);
 
         _staticMethods[name] = (ctx, thisArg, args) =>
         {
@@ -362,7 +362,7 @@ public sealed class JSClassBuilder
     /// <exception cref="ArgumentNullException"><paramref name="name"/> or <paramref name="method"/> is <c>null</c>.</exception>
     public JSClassBuilder AddStaticMethodAsync(string name, JSAsyncAction method)
     {
-        if (method == null) throw new ArgumentNullException(nameof(method));
+        ArgumentNullException.ThrowIfNull(method);
 
         _staticMethods[name] = (ctx, thisArg, args) =>
         {
@@ -417,8 +417,7 @@ public sealed class JSClassBuilder
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Property name cannot be null or whitespace", nameof(name));
-        if (getter == null)
-            throw new ArgumentNullException(nameof(getter));
+        ArgumentNullException.ThrowIfNull(getter);
 
         _properties[name] = new ClassOptions.PropertyDefinition
         {
@@ -496,8 +495,7 @@ public sealed class JSClassBuilder
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Property name cannot be null or whitespace", nameof(name));
-        if (getter == null)
-            throw new ArgumentNullException(nameof(getter));
+        ArgumentNullException.ThrowIfNull(getter);
 
         _staticProperties[name] = new ClassOptions.PropertyDefinition
         {

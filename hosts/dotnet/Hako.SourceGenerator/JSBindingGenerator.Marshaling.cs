@@ -302,6 +302,7 @@ public partial class JSBindingGenerator
             var p = delegateInfo.Parameters[i];
             var argName = $"args[{i}]";
             var varName = p.Name;
+            var isAnyType = p.TypeInfo.SpecialType == SpecialType.System_Object;
 
             if (p.IsOptional)
             {
@@ -313,9 +314,13 @@ public partial class JSBindingGenerator
                 sb.AppendLine($"{indent}        if ({argName}.IsNullOrUndefined())");
                 sb.AppendLine(
                     $"{indent}            return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Parameter '{varName}' cannot be null or undefined\");");
-                sb.AppendLine($"{indent}        if (!{GetTypeCheck(p.TypeInfo, argName)})");
-                sb.AppendLine(
-                    $"{indent}            return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Parameter '{varName}' must be {GetTypeName(p.TypeInfo)}\");");
+                if (!isAnyType)
+                {
+                    sb.AppendLine($"{indent}        if (!{GetTypeCheck(p.TypeInfo, argName)})");
+                    sb.AppendLine(
+                        $"{indent}            return ctx.ThrowError(global::HakoJS.VM.JSErrorType.Type, \"Parameter '{varName}' must be {GetTypeName(p.TypeInfo)}\");");
+                }
+
                 sb.AppendLine($"{indent}        var {varName} = {GetStrictUnmarshalCode(p.TypeInfo, argName)};");
             }
         }
@@ -707,11 +712,12 @@ public partial class JSBindingGenerator
         if (type.UnderlyingType != null)
         {
             var underlyingTypeInfo = CreateTypeInfo(type.UnderlyingType);
+            var isUnderlyingAnyType = underlyingTypeInfo.SpecialType == SpecialType.System_Object;
 
             if (isRequired)
             {
                 sb.AppendLine($"{indent}var arg{index}IsNull = {argName}.IsNullOrUndefined();");
-                if (!isAnyType)
+                if (!isUnderlyingAnyType)
                 {
                     sb.AppendLine($"{indent}if (!arg{index}IsNull && !{GetTypeCheck(underlyingTypeInfo, argName)})");
                     sb.AppendLine(
@@ -728,7 +734,7 @@ public partial class JSBindingGenerator
                 sb.AppendLine($"{indent}if (args.Length > {index})");
                 sb.AppendLine($"{indent}{{");
                 sb.AppendLine($"{indent}    var arg{index}IsNull = {argName}.IsNullOrUndefined();");
-                if (!isAnyType)
+                if (!isUnderlyingAnyType)
                 {
                     sb.AppendLine(
                         $"{indent}    if (!arg{index}IsNull && !{GetTypeCheck(underlyingTypeInfo, argName)})");
@@ -953,7 +959,9 @@ public partial class JSBindingGenerator
         if (type.UnderlyingType != null)
         {
             var underlyingTypeInfo = CreateTypeInfo(type.UnderlyingType);
-            if (!isAnyType)
+            var isUnderlyingAnyType = underlyingTypeInfo.SpecialType == SpecialType.System_Object;
+
+            if (!isUnderlyingAnyType)
             {
                 sb.AppendLine(
                     $"{indent}if (!{jsValueName}.IsNullOrUndefined() && !{GetTypeCheck(underlyingTypeInfo, jsValueName)})");

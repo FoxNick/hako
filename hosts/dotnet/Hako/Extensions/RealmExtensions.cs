@@ -23,8 +23,7 @@ public static class RealmExtensions
     /// </remarks>
     public static JSObjectBuilder BuildObject(this Realm context)
     {
-        if (context == null)
-            throw new ArgumentNullException(nameof(context));
+        ArgumentNullException.ThrowIfNull(context);
 
         return JSObjectBuilder.Create(context);
     }
@@ -42,8 +41,7 @@ public static class RealmExtensions
     /// </remarks>
     public static JSObjectBuilder BuildObject(this Realm context, JSValue prototype)
     {
-        if (context == null)
-            throw new ArgumentNullException(nameof(context));
+        ArgumentNullException.ThrowIfNull(context);
 
         return JSObjectBuilder.Create(context).WithPrototype(prototype);
     }

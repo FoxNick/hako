@@ -48,8 +48,7 @@ internal class MemoryManager
 
     public DisposableValue<int> AllocateRuntimeString(int rt, string str, out int length)
     {
-        if (str == null)
-            throw new ArgumentNullException(nameof(str));
+        ArgumentNullException.ThrowIfNull(str);
 
         var bytes = _utf8Encoding.GetBytes(str);
         int ptr = AllocateRuntimeMemory(rt, bytes.Length + 1);
@@ -79,8 +78,7 @@ internal class MemoryManager
 
     public DisposableValue<int> AllocateString(int ctx, string str, out int length)
     {
-        if (str == null)
-            throw new ArgumentNullException(nameof(str));
+        ArgumentNullException.ThrowIfNull(str);
 
         var bytes = _utf8Encoding.GetBytes(str);
         int ptr = AllocateMemory(ctx, bytes.Length + 1);
@@ -95,8 +93,7 @@ internal class MemoryManager
 
     public DisposableValue<(int Pointer, int Length)> WriteNullTerminatedString(int ctx, string str)
     {
-        if (str == null)
-            throw new ArgumentNullException(nameof(str));
+        ArgumentNullException.ThrowIfNull(str);
 
         var bytes = _utf8Encoding.GetBytes(str);
         int ptr = AllocateMemory(ctx, bytes.Length + 1);

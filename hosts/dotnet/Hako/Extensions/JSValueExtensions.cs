@@ -961,12 +961,10 @@ public static class JSValueExtensions
         bool enumerable,
         bool configurable)
     {
-        if (obj == null)
-            throw new ArgumentNullException(nameof(obj));
+        ArgumentNullException.ThrowIfNull(obj);
         if (string.IsNullOrWhiteSpace(key))
             throw new ArgumentException("Property key cannot be null or whitespace", nameof(key));
-        if (value == null)
-            throw new ArgumentNullException(nameof(value));
+        ArgumentNullException.ThrowIfNull(value);
 
         var realm = obj.Realm;
         using var keyValue = realm.NewString(key);

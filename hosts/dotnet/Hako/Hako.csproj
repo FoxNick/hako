@@ -48,8 +48,15 @@
           <PrivateAssets>all</PrivateAssets>
           <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
     </ItemGroup>
+
+    <ItemGroup>
+        <Compile Include="..\modules\Ben.Demystifier\src\**\*.cs">
+            <Link>%(RecursiveDir)\%(Filename)%(Extension)</Link>
+        </Compile>
+        <Compile Remove="..\modules\Ben.Demystifier\**\obj\**" />
+    </ItemGroup>
+
 
     <ItemGroup>
         <InternalsVisibleTo Include="Hako.Tests"/>

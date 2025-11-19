@@ -1,5 +1,7 @@
 namespace HakoJS.Host;
 
+using System.Runtime.ExceptionServices;
+
 /// <summary>
 /// Provides a thread-safe dispatcher for executing operations on the HakoJS event loop thread.
 /// </summary>
@@ -78,20 +80,25 @@ public sealed class HakoDispatcher
     /// <exception cref="InvalidOperationException">Hako has not been initialized or the event loop is shutting down.</exception>
     /// <exception cref="ArgumentNullException"><paramref name="action"/> is <c>null</c>.</exception>
     /// <exception cref="OperationCanceledException">The operation was canceled.</exception>
-    /// <exception cref="AggregateException">The action threw an exception.</exception>
     public void Invoke(Action action, CancellationToken cancellationToken = default)
     {
         if (_isOrphaned)
         {
-            if (action == null)
-                throw new ArgumentNullException(nameof(action));
-            
+            ArgumentNullException.ThrowIfNull(action);
+
             cancellationToken.ThrowIfCancellationRequested();
             action();
             return;
         }
 
-        EventLoop.Invoke(action, cancellationToken);
+        try
+        {
+            EventLoop.Invoke(action, cancellationToken);
+        }
+        catch (AggregateException ex) when (ex.InnerExceptions.Count == 1)
+        {
+            ExceptionDispatchInfo.Capture(ex.InnerException!).Throw();
+        }
     }
 
     /// <summary>
@@ -105,19 +112,25 @@ public sealed class HakoDispatcher
     /// <exception cref="InvalidOperationException">Hako has not been initialized or the event loop is shutting down.</exception>
     /// <exception cref="ArgumentNullException"><paramref name="func"/> is <c>null</c>.</exception>
     /// <exception cref="OperationCanceledException">The operation was canceled.</exception>
-    /// <exception cref="AggregateException">The function threw an exception.</exception>
     public T Invoke<T>(Func<T> func, CancellationToken cancellationToken = default)
     {
         if (_isOrphaned)
         {
-            if (func == null)
-                throw new ArgumentNullException(nameof(func));
-            
+            ArgumentNullException.ThrowIfNull(func);
+
             cancellationToken.ThrowIfCancellationRequested();
             return func();
         }
 
-        return EventLoop.Invoke(func, cancellationToken);
+        try
+        {
+            return EventLoop.Invoke(func, cancellationToken);
+        }
+        catch (AggregateException ex) when (ex.InnerExceptions.Count == 1)
+        {
+            ExceptionDispatchInfo.Capture(ex.InnerException!).Throw();
+            throw; // This line is unreachable but required for compilation
+        }
     }
 
     /// <summary>
@@ -136,9 +149,8 @@ public sealed class HakoDispatcher
     {
         if (_isOrphaned)
         {
-            if (action == null)
-                throw new ArgumentNullException(nameof(action));
-            
+            ArgumentNullException.ThrowIfNull(action);
+
             if (cancellationToken.IsCancellationRequested)
                 return Task.FromCanceled(cancellationToken);
 
@@ -173,9 +185,8 @@ public sealed class HakoDispatcher
     {
         if (_isOrphaned)
         {
-            if (func == null)
-                throw new ArgumentNullException(nameof(func));
-            
+            ArgumentNullException.ThrowIfNull(func);
+
             if (cancellationToken.IsCancellationRequested)
                 return Task.FromCanceled<T>(cancellationToken);
 
@@ -208,9 +219,8 @@ public sealed class HakoDispatcher
     {
         if (_isOrphaned)
         {
-            if (asyncAction == null)
-                throw new ArgumentNullException(nameof(asyncAction));
-            
+            ArgumentNullException.ThrowIfNull(asyncAction);
+
             if (cancellationToken.IsCancellationRequested)
                 return Task.FromCanceled(cancellationToken);
 
@@ -244,9 +254,8 @@ public sealed class HakoDispatcher
     {
         if (_isOrphaned)
         {
-            if (asyncFunc == null)
-                throw new ArgumentNullException(nameof(asyncFunc));
-            
+            ArgumentNullException.ThrowIfNull(asyncFunc);
+
             if (cancellationToken.IsCancellationRequested)
                 return Task.FromCanceled<T>(cancellationToken);
 
@@ -278,9 +287,8 @@ public sealed class HakoDispatcher
     {
         if (_isOrphaned)
         {
-            if (action == null)
-                throw new ArgumentNullException(nameof(action));
-            
+            ArgumentNullException.ThrowIfNull(action);
+
             try
             {
                 action();
@@ -311,9 +319,8 @@ public sealed class HakoDispatcher
     {
         if (_isOrphaned)
         {
-            if (asyncAction == null)
-                throw new ArgumentNullException(nameof(asyncAction));
-            
+            ArgumentNullException.ThrowIfNull(asyncAction);
+
             try
             {
                 _ = asyncAction();

@@ -32,7 +32,29 @@ var realm = runtime.CreateRealm().WithGlobals(g => g
         ["host"] = "localhost",
         ["port"] = 3000,
         ["features"] = new[] { "auth", "api", "websockets" }
+    })
+    // Error handling examples
+    .WithFunction("throwSimpleError", (ctx, _, args) => throw new Exception("Something went wrong!"))
+    .WithFunction("throwWithCause", (ctx, _, args) =>
+    {
+        try
+        {
+            throw new InvalidOperationException("Database connection failed");
+        }
+        catch (Exception ex)
+        {
+            throw new Exception("Failed to fetch user data", ex);
+        }
+    })
+    .WithFunction("divide", (ctx, _, args) =>
+    {
+        var a = (int)args[0].AsNumber();
+        var b = (int)args[1].AsNumber();
+        
+        return b == 0 ? throw new DivideByZeroException("Cannot divide by zero") : ctx.NewNumber(a / b);
     }));
+
+Console.WriteLine("=== Basic Host Functions ===\n");
 
 await realm.EvalAsync(@"
     console.log('2 + 3 =', add(2, 3));
@@ -46,6 +68,34 @@ Console.WriteLine($"Fetched: {item.GetProperty("name").AsString()}");
 await realm.EvalAsync(@"
     console.log(`Server: ${config.host}:${config.port}`);
     console.log('Features:', config.features.join(', '));
+");
+
+Console.WriteLine("\n=== Error Handling Examples ===\n");
+
+await realm.EvalAsync(@"
+console.log('1. Simple error:');
+try {
+    throwSimpleError();
+} catch (e) {
+    console.log('Caught:', e.message);
+    console.log(e.stack);
+}
+
+console.log('\n2. Error with cause:');
+try {
+    throwWithCause();
+} catch (e) {
+    console.log('Caught:', e.message);
+    console.log(e.stack);
+}
+
+console.log('\n3. Division by zero:');
+try {
+    console.log('10 / 2 =', divide(10, 2));
+    console.log('10 / 0 =', divide(10, 0));
+} catch (e) {
+    console.log('Caught:', e.message);
+}
 ");
 
 item.Dispose();

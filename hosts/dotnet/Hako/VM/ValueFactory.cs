@@ -1,8 +1,12 @@
 using System.Collections;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
+using System.Text;
 using HakoJS.Exceptions;
 using HakoJS.Host;
 using HakoJS.SourceGeneration;
+using HakoJS.Utils;
 
 namespace HakoJS.VM;
 
@@ -31,7 +35,7 @@ internal sealed class ValueFactory(Realm context) : IDisposable
             IJSMarshalable marshalable => marshalable.ToJSValue(Context),
             bool b => CreateBoolean(b),
             long => CreateBigInt(Convert.ToInt64(value)),
-            ulong  => CreateBigUInt(Convert.ToUInt64(value)),
+            ulong => CreateBigUInt(Convert.ToUInt64(value)),
             byte or sbyte or short or ushort or int or uint or float or double or decimal
                 => CreateNumber(Convert.ToDouble(value)),
             string str => CreateString(str),
@@ -124,19 +128,19 @@ internal sealed class ValueFactory(Realm context) : IDisposable
 
     private JSValue CreateBigInt(long value)
     {
-        var big = Context.Runtime.Registry.NewBigInt(Context.Pointer,value);
+        var big = Context.Runtime.Registry.NewBigInt(Context.Pointer, value);
         var error = Context.GetLastError(big);
         if (error != null)
         {
             Context.FreeValuePointer(big);
             throw new HakoException("Error creating BigInt", error);
         }
+
         return new JSValue(Context, big);
     }
-    
+
     private JSValue CreateBigUInt(ulong value)
     {
-
         var big = Context.Runtime.Registry.NewBigUInt(Context.Pointer, value);
         var error = Context.GetLastError(big);
         if (error != null)
@@ -144,6 +148,7 @@ internal sealed class ValueFactory(Realm context) : IDisposable
             Context.FreeValuePointer(big);
             throw new HakoException("Error creating BigUInt", error);
         }
+
         return new JSValue(Context, big);
     }
 
@@ -213,6 +218,7 @@ internal sealed class ValueFactory(Realm context) : IDisposable
         return new JSValue(Context, datePtr);
     }
 
+    [UnconditionalSuppressMessage("Trimming", "IL2026:Members annotated with 'RequiresUnreferencedCodeAttribute' require dynamic access otherwise can break functionality when trimming application code", Justification = "Checked at runtime>")]
     private JSValue CreateError(Exception error)
     {
         var errorPtr = Context.Runtime.Registry.NewError(Context.Pointer);
@@ -221,8 +227,10 @@ internal sealed class ValueFactory(Realm context) : IDisposable
         try
         {
             using var message = CreateString(error.Message);
-            using var name = CreateString("NativeException");
-            using var stack = CreateString(error.StackTrace ?? "");
+            using var name = CreateString(error.GetType().Name);
+            
+            var v8StackTrace = V8StackTraceFormatter.Format(AotHelper.IsAot ? error: error.Demystify());
+            using var stack = CreateString(v8StackTrace);
 
             SetErrorProperty(errorPtr, "message", message);
             SetErrorProperty(errorPtr, "name", name);
@@ -239,12 +247,11 @@ internal sealed class ValueFactory(Realm context) : IDisposable
         }
         catch
         {
-            // If anything goes wrong, free the error pointer before re-throwing
             Context.FreeValuePointer(errorPtr);
             throw;
         }
     }
-
+    
     private void SetErrorProperty(int errorPtr, string key, JSValue value)
     {
         using var keyValue = CreateString(key);
@@ -300,7 +307,6 @@ internal sealed class ValueFactory(Realm context) : IDisposable
                 using var propValue = FromNativeValue(entry.Value, options);
                 jsObj.SetProperty(key, propValue);
             }
-           
         }
 
         return jsObj.Dup();

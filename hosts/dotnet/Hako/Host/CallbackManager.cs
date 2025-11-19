@@ -130,8 +130,7 @@ internal sealed class CallbackManager
 
     internal void BindToLinker(WasmLinker linker)
     {
-        if (linker == null)
-            throw new ArgumentNullException(nameof(linker));
+        ArgumentNullException.ThrowIfNull(linker);
 
         linker.DefineFunction<int, int, int, int, int, int>(
             "hako", "call_function",

@@ -302,8 +302,7 @@ public sealed class JSObjectBuilder : IDisposable
         ThrowIfBuilt();
         ThrowIfDisposed();
 
-        if (properties == null)
-            throw new ArgumentNullException(nameof(properties));
+        ArgumentNullException.ThrowIfNull(properties);
 
         foreach (var kvp in properties)
             _properties.Add(new PropertyEntry<T>(
@@ -864,8 +863,7 @@ public sealed class JSObjectBuilder : IDisposable
 
         if (string.IsNullOrWhiteSpace(key))
             throw new ArgumentException("Property key cannot be null or whitespace", nameof(key));
-        if (value == null)
-            throw new ArgumentNullException(nameof(value));
+        ArgumentNullException.ThrowIfNull(value);
 
         _properties.Add(new PropertyEntry<JSValue>(
             key,
@@ -886,8 +884,7 @@ public sealed class JSObjectBuilder : IDisposable
 
         if (string.IsNullOrWhiteSpace(key))
             throw new ArgumentException("Property key cannot be null or whitespace", nameof(key));
-        if (value == null)
-            throw new ArgumentNullException(nameof(value));
+        ArgumentNullException.ThrowIfNull(value);
 
         _properties.Add(new PropertyEntry<JSValue>(
             key,
@@ -908,8 +905,7 @@ public sealed class JSObjectBuilder : IDisposable
 
         if (string.IsNullOrWhiteSpace(key))
             throw new ArgumentException("Property key cannot be null or whitespace", nameof(key));
-        if (value == null)
-            throw new ArgumentNullException(nameof(value));
+        ArgumentNullException.ThrowIfNull(value);
 
         _properties.Add(new PropertyEntry<JSValue>(
             key,
@@ -934,8 +930,7 @@ public sealed class JSObjectBuilder : IDisposable
 
         if (string.IsNullOrWhiteSpace(key))
             throw new ArgumentException("Property key cannot be null or whitespace", nameof(key));
-        if (value == null)
-            throw new ArgumentNullException(nameof(value));
+        ArgumentNullException.ThrowIfNull(value);
 
         _properties.Add(new PropertyEntry<JSObject>(
             key,
@@ -956,8 +951,7 @@ public sealed class JSObjectBuilder : IDisposable
 
         if (string.IsNullOrWhiteSpace(key))
             throw new ArgumentException("Property key cannot be null or whitespace", nameof(key));
-        if (value == null)
-            throw new ArgumentNullException(nameof(value));
+        ArgumentNullException.ThrowIfNull(value);
 
         _properties.Add(new PropertyEntry<JSObject>(
             key,
@@ -978,8 +972,7 @@ public sealed class JSObjectBuilder : IDisposable
 
         if (string.IsNullOrWhiteSpace(key))
             throw new ArgumentException("Property key cannot be null or whitespace", nameof(key));
-        if (value == null)
-            throw new ArgumentNullException(nameof(value));
+        ArgumentNullException.ThrowIfNull(value);
 
         _properties.Add(new PropertyEntry<JSObject>(
             key,
@@ -1108,8 +1101,7 @@ public sealed class JSObjectBuilder : IDisposable
 
         if (string.IsNullOrWhiteSpace(key))
             throw new ArgumentException("Property key cannot be null or whitespace", nameof(key));
-        if (value == null)
-            throw new ArgumentNullException(nameof(value));
+        ArgumentNullException.ThrowIfNull(value);
 
         _properties.Add(new PropertyEntry<JSValue>(
             key,
@@ -1130,8 +1122,7 @@ public sealed class JSObjectBuilder : IDisposable
 
         if (string.IsNullOrWhiteSpace(key))
             throw new ArgumentException("Property key cannot be null or whitespace", nameof(key));
-        if (value == null)
-            throw new ArgumentNullException(nameof(value));
+        ArgumentNullException.ThrowIfNull(value);
 
         _properties.Add(new PropertyEntry<JSObject>(
             key,

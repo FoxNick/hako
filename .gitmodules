@@ -1,3 +1,6 @@
 [submodule "engine"]
 	path = engine
 	url = https://github.com/6over3/quickjs
+[submodule "hosts/dotnet/modules/Ben.Demystifier"]
+	path = hosts/dotnet/modules/Ben.Demystifier
+	url = https://github.com/6over3/Ben.Demystifier

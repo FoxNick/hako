@@ -6,9 +6,10 @@ namespace HakoJS.Exceptions;
 
 /// <summary>
 /// Represents a JavaScript Promise rejection surfaced to .NET.
-/// Unlike typical exceptions, the rejection <c>reason</c> may be any JS value
+/// Unlike typical exceptions, the rejection reason may be any JS value
 /// (string, object, array, Error-like, null). When the reason is a JavaScript error,
 /// it will be wrapped as a <see cref="JavaScriptException"/> and set as the InnerException.
+/// Formatting is handled by V8StackTraceFormatter.
 /// </summary>
 public sealed class PromiseRejectedException : Exception
 {
@@ -173,78 +174,5 @@ public sealed class PromiseRejectedException : Exception
 
             return Message;
         }
-    }
-
-    public override string ToString()
-    {
-        var sb = new StringBuilder();
-        sb.AppendLine(Message);
-
-        if (InnerException != null)
-        {
-            sb.AppendLine();
-            sb.AppendLine("Caused by:");
-            sb.Append(InnerException.ToString());
-        }
-        else if (Reason != null && !IsErrorLike)
-        {
-            // For non-error rejections, show the raw value
-            sb.AppendLine();
-            sb.Append("Rejection value: ");
-            sb.Append(FormatValue(Reason));
-        }
-
-        if (!string.IsNullOrEmpty(StackTrace))
-        {
-            sb.AppendLine();
-            sb.Append(StackTrace);
-        }
-
-        return sb.ToString().TrimEnd();
-    }
-
-    private static string FormatValue(object? value)
-    {
-        return value switch
-        {
-            null => "null",
-            string s => $"\"{s}\"",
-            Dictionary<string, object?> dict => FormatObject(dict),
-            List<object?> list => FormatArray(list),
-            bool b => b ? "true" : "false",
-            _ => value.ToString() ?? "null"
-        };
-    }
-
-    private static string FormatObject(Dictionary<string, object?> dict)
-    {
-        var sb = new StringBuilder("{ ");
-        var first = true;
-
-        foreach (var kvp in dict)
-        {
-            if (!first) sb.Append(", ");
-            first = false;
-
-            sb.Append(kvp.Key).Append(": ");
-            sb.Append(FormatValue(kvp.Value));
-        }
-
-        sb.Append(" }");
-        return sb.ToString();
-    }
-
-    private static string FormatArray(List<object?> list)
-    {
-        var sb = new StringBuilder("[ ");
-
-        for (var i = 0; i < list.Count; i++)
-        {
-            if (i > 0) sb.Append(", ");
-            sb.Append(FormatValue(list[i]));
-        }
-
-        sb.Append(" ]");
-        return sb.ToString();
     }
 }
