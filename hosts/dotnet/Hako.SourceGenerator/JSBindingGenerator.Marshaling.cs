@@ -37,7 +37,9 @@ public partial class JSBindingGenerator
         sb.AppendLine("using HakoJS.Extensions;");
         sb.AppendLine("using HakoJS.SourceGeneration;");
         sb.AppendLine();
-        if (!string.IsNullOrEmpty(model.SourceNamespace)) sb.AppendLine($"namespace {model.SourceNamespace};");
+        var isNested = model.TypeSymbol?.ContainingType != null;
+        if (!isNested && !string.IsNullOrEmpty(model.SourceNamespace))
+            sb.AppendLine($"namespace {model.SourceNamespace};");
 
         sb.AppendLine();
 

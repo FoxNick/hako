@@ -291,6 +291,8 @@ public partial class JSBindingGenerator
         public string TypeScriptDefinition { get; set; } = "";
         public string? Documentation { get; set; }
         public Accessibility DeclaredAccessibility { get; set; } = Accessibility.Public;
+        
+        public INamedTypeSymbol Symbol { get; set; }
     }
 
     private class EnumValueModel

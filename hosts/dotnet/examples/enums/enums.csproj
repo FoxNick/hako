@@ -13,5 +13,6 @@
         <ProjectReference Include="..\..\Hako\Hako.csproj" />
         <ProjectReference Include="..\..\Hako.SourceGenerator\Hako.SourceGenerator.csproj" OutputItemType="Analyzer"  ReferenceOutputAssembly="false"/>
     </ItemGroup>
+    
 
 </Project>

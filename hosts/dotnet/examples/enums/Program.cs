@@ -31,7 +31,7 @@ modResult.Dispose();
 
 
 // C# 14
-Console.WriteLine(FileAccess.TypeDefinition);
+Console.WriteLine(FileSystemModule.FileAccess.TypeDefinition);
 Console.WriteLine(LogEntry.TypeDefinition);
 Console.WriteLine(FileSystemModule.TypeDefinition);
 
