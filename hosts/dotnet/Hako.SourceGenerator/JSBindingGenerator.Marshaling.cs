@@ -31,6 +31,7 @@ public partial class JSBindingGenerator
         sb.AppendLine("#nullable enable");
         sb.AppendLine();
         sb.AppendLine("using System;");
+        sb.AppendLine("using System.Linq;");
         sb.AppendLine("using System.Threading.Tasks;");
         sb.AppendLine("using HakoJS.VM;");
         sb.AppendLine("using HakoJS.Extensions;");

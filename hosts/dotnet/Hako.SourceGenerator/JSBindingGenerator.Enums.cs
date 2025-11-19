@@ -18,11 +18,10 @@ public partial class JSBindingGenerator
     {
         if (context.TargetSymbol is not INamedTypeSymbol enumSymbol)
             return new EnumResult(null, ImmutableArray<Diagnostic>.Empty);
-
-        var diagnostics = ImmutableArray.CreateBuilder<Diagnostic>();
+        
 
         if (enumSymbol.TypeKind != TypeKind.Enum)
-            return new EnumResult(null, diagnostics.ToImmutable());
+            return new EnumResult(null, ImmutableArray.CreateBuilder<Diagnostic>().ToImmutable());
 
         var jsEnumAttr = enumSymbol.GetAttributes()
             .FirstOrDefault(a => a.AttributeClass?.ToDisplayString() == "HakoJS.SourceGeneration.JSEnumAttribute");
@@ -35,13 +34,14 @@ public partial class JSBindingGenerator
         {
             foreach (var arg in jsEnumAttr.NamedArguments)
             {
-                if (arg.Key == "Casing" && arg.Value.Value != null)
+                switch (arg)
                 {
-                    casing = (NameCasing)(int)arg.Value.Value;
-                }
-                else if (arg.Key == "ValueCasing" && arg.Value.Value != null)
-                {
-                    valueCasing = (ValueCasing)(int)arg.Value.Value;
+                    case { Key: "Casing", Value.Value: not null }:
+                        casing = (NameCasing)(int)arg.Value.Value;
+                        break;
+                    case { Key: "ValueCasing", Value.Value: not null }:
+                        valueCasing = (ValueCasing)(int)arg.Value.Value;
+                        break;
                 }
             }
         }
@@ -112,7 +112,7 @@ public partial class JSBindingGenerator
     private static string GenerateEnumBinding(
         EnumModel model,
         (Platform Platform, OptimizationLevel OptimizationLevel, string? AssemblyName,
-            Microsoft.CodeAnalysis.CSharp.LanguageVersion? LanguageVersion) compilationSettings)
+            LanguageVersion? LanguageVersion) compilationSettings)
     {
         var sb = new StringBuilder();
 
@@ -128,13 +128,18 @@ public partial class JSBindingGenerator
         sb.AppendLine();
 
         var accessibility = GetAccessibilityModifier(model.DeclaredAccessibility);
+        
+        // Build the fully qualified enum type name
+        var fullEnumTypeName = string.IsNullOrEmpty(model.SourceNamespace)
+            ? $"global::{model.EnumName}"
+            : $"global::{model.SourceNamespace}.{model.EnumName}";
 
         // Generate the extension class for ToStringFast
         sb.AppendLine($"{accessibility} static class {model.EnumName}Extensions");
         sb.AppendLine("{");
 
         // Generate ToStringFast method
-        sb.AppendLine($"    {accessibility} static string ToStringFast(this {model.EnumName} value)");
+        sb.AppendLine($"    {accessibility} static string ToStringFast(this {fullEnumTypeName} value)");
 
         if (model.IsFlags)
         {
@@ -145,20 +150,15 @@ public partial class JSBindingGenerator
 
             // Add case for zero
             var zeroValue = model.Values.FirstOrDefault(v => Convert.ToInt64(v.Value) == 0);
-            if (zeroValue != null)
-            {
-                sb.AppendLine($"            0 => nameof({model.EnumName}.{zeroValue.Name}),");
-            }
-            else
-            {
-                sb.AppendLine("            0 => \"0\",");
-            }
+            sb.AppendLine(zeroValue != null
+                ? $"            0 => nameof({fullEnumTypeName}.{zeroValue.Name}),"
+                : "            0 => \"0\",");
 
             // Add cases for individual known values
             foreach (var enumValue in model.Values.Where(v => Convert.ToInt64(v.Value) != 0))
             {
                 sb.AppendLine(
-                    $"            {model.EnumName}.{enumValue.Name} => nameof({model.EnumName}.{enumValue.Name}),");
+                    $"            {fullEnumTypeName}.{enumValue.Name} => nameof({fullEnumTypeName}.{enumValue.Name}),");
             }
 
             sb.AppendLine("            _ => FormatFlags(value)");
@@ -166,21 +166,20 @@ public partial class JSBindingGenerator
             sb.AppendLine();
 
             // Generate the helper method for building the flags string
-            sb.AppendLine($"        static string FormatFlags({model.EnumName} value)");
+            sb.AppendLine($"        static string FormatFlags({fullEnumTypeName} value)");
             sb.AppendLine("        {");
-            sb.AppendLine("            var flags = new System.Collections.Generic.List<string>();");
+            sb.AppendLine("            var flags = new global::System.Collections.Generic.List<string>();");
             sb.AppendLine();
 
             foreach (var enumValue in model.Values.Where(v => Convert.ToInt64(v.Value) != 0))
             {
-                var enumValueLong = Convert.ToInt64(enumValue.Value);
                 sb.AppendLine(
-                    $"            if ((value & {model.EnumName}.{enumValue.Name}) == {model.EnumName}.{enumValue.Name})");
-                sb.AppendLine($"                flags.Add(nameof({model.EnumName}.{enumValue.Name}));");
+                    $"            if ((value & {fullEnumTypeName}.{enumValue.Name}) == {fullEnumTypeName}.{enumValue.Name})");
+                sb.AppendLine($"                flags.Add(nameof({fullEnumTypeName}.{enumValue.Name}));");
             }
 
             sb.AppendLine();
-            sb.AppendLine("            return flags.Count > 0 ? string.Join(\", \", flags) : value.ToString();");
+            sb.AppendLine("            return flags.Count > 0 ? global::System.String.Join(\", \", flags) : value.ToString();");
             sb.AppendLine("        }");
             sb.AppendLine("    }");
         }
@@ -193,7 +192,7 @@ public partial class JSBindingGenerator
             foreach (var enumValue in model.Values)
             {
                 sb.AppendLine(
-                    $"            {model.EnumName}.{enumValue.Name} => nameof({model.EnumName}.{enumValue.Name}),");
+                    $"            {fullEnumTypeName}.{enumValue.Name} => nameof({fullEnumTypeName}.{enumValue.Name}),");
             }
 
             sb.AppendLine("            _ => value.ToString(),");
@@ -210,7 +209,7 @@ public partial class JSBindingGenerator
             // Use C# 14+ extension syntax
             sb.AppendLine($"{accessibility} static class {model.EnumName}TypeDefinition");
             sb.AppendLine("{");
-            sb.AppendLine($"    extension({model.EnumName})");
+            sb.AppendLine($"    extension({fullEnumTypeName})");
             sb.AppendLine("    {");
             sb.AppendLine($"        {accessibility} static string TypeDefinition");
             sb.AppendLine("        {");
