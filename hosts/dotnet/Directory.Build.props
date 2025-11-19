@@ -6,4 +6,9 @@
         <HakoPackageVersion Condition="'$(DevBuild)'=='true'">$(HakoVersion)$(HakoDotnetVersion)-dev</HakoPackageVersion>
         <HakoPackageVersion Condition="'$(HakoPackageVersion)'==''">$(HakoVersion)$(HakoDotnetVersion)</HakoPackageVersion>
     </PropertyGroup>
+
+    <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+        <EnableSourceLink>false</EnableSourceLink>
+        <EnableSourceControlManagerQueries>false</EnableSourceControlManagerQueries>
+    </PropertyGroup>
 </Project>
