@@ -1,3 +1,5 @@
+using HakoJS.Exceptions;
+
 namespace HakoJS.VM;
 
 /// <summary>
@@ -56,7 +58,7 @@ public sealed class JSObject : IDisposable
         if (_disposed)
             return;
 
-        _value?.Dispose();
+        _value.Dispose();
         _disposed = true;
     }
 

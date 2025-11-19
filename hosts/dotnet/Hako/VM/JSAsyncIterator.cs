@@ -1,3 +1,4 @@
+using HakoJS.Extensions;
 using HakoJS.Host;
 using HakoJS.Lifetime;
 

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using HakoJS.Exceptions;
+using HakoJS.Extensions;
 using HakoJS.Host;
 using HakoJS.Lifetime;
 using HakoJS.SourceGeneration;

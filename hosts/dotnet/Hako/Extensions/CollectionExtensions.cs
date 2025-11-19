@@ -20,7 +20,7 @@ public static class CollectionExtensions
     /// <remarks>
     ///     <para>
     ///         This method handles primitive types only. For custom types implementing <see cref="IJSMarshalable{T}" />,
-    ///         use <see cref="ToJSArrayOf{T}" /> instead.
+    ///         use <see cref="JSValueExtensions.ToArrayOf{T}" /> instead.
     ///     </para>
     ///     <para>
     ///         Example:

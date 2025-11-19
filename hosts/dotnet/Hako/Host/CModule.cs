@@ -1,4 +1,5 @@
 using HakoJS.Exceptions;
+using HakoJS.Extensions;
 using HakoJS.VM;
 
 namespace HakoJS.Host;
@@ -160,7 +161,7 @@ public sealed class CModule : IDisposable
 
         _createdClasses.Clear();
 
-        Context.Runtime.Callbacks.UnregisterModuleInitHandler(Name);
+        if (Name != null) Context.Runtime.Callbacks.UnregisterModuleInitHandler(Name);
         _disposed = true;
     }
 

@@ -1,3 +1,5 @@
+using HakoJS.Extensions;
+
 namespace HakoJS.VM;
 
 /// <summary>
