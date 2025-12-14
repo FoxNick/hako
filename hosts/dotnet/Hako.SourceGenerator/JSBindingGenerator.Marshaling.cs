@@ -1045,7 +1045,8 @@ public partial class JSBindingGenerator
                 ? $"{jsValueName}.IsNumber()"
                 : $"{jsValueName}.IsString()";
 
-        if (type.FullName == "global::System.Byte[]")
+        if (type.FullName is "global::System.Byte[]" or "byte[]" ||
+            (type.IsArray && type.ItemTypeSymbol?.SpecialType == SpecialType.System_Byte))
             return $"({jsValueName}.IsArrayBuffer() || {jsValueName}.IsTypedArray())";
 
         if (type.IsArray)
@@ -1157,7 +1158,8 @@ public partial class JSBindingGenerator
             return $"global::System.Enum.Parse<{type.FullName}>({jsValueName}.AsString(), ignoreCase: true)";
         }
 
-        if (type.FullName == "global::System.Byte[]")
+        if (type.FullName is "global::System.Byte[]" or "byte[]" ||
+            (type.IsArray && type.ItemTypeSymbol?.SpecialType == SpecialType.System_Byte))
             return
                 $"({jsValueName}.IsArrayBuffer() ? {jsValueName}.CopyArrayBuffer() : {jsValueName}.CopyTypedArray())";
 
@@ -1196,6 +1198,58 @@ public partial class JSBindingGenerator
         if (type.SpecialType == SpecialType.System_Object)
             return $"{jsValueName}.GetNativeValue<object>()";
 
+        // Handle generic dictionaries
+        if (type is { IsGenericDictionary: true, KeyTypeSymbol: not null, ValueTypeSymbol: not null })
+        {
+            var keyTypeInfo = CreateTypeInfo(type.KeyTypeSymbol);
+            var isKeyValid = keyTypeInfo.SpecialType == SpecialType.System_String ||
+                             IsNumericType(type.KeyTypeSymbol);
+
+            if (isKeyValid)
+            {
+                var isValueMarshalable = ImplementsIJSMarshalable(type.ValueTypeSymbol) ||
+                                         HasAttribute(type.ValueTypeSymbol,
+                                             "HakoJS.SourceGeneration.JSClassAttribute") ||
+                                         HasAttribute(type.ValueTypeSymbol,
+                                             "HakoJS.SourceGeneration.JSObjectAttribute");
+
+                if (isValueMarshalable)
+                    return $"{jsValueName}.ToDictionaryOf<{type.KeyType}, {type.ValueType}>()";
+
+                return $"{jsValueName}.ToDictionary<{type.KeyType}, {type.ValueType}>()";
+            }
+
+            return $"{jsValueName}.GetNativeValue<object>()";
+        }
+
+        // Handle generic collections (List<T>, IList<T>, etc.)
+        if (type is { IsGenericCollection: true, ItemTypeSymbol: not null })
+        {
+            var isItemMarshalable = ImplementsIJSMarshalable(type.ItemTypeSymbol) ||
+                                    HasAttribute(type.ItemTypeSymbol, "HakoJS.SourceGeneration.JSClassAttribute") ||
+                                    HasAttribute(type.ItemTypeSymbol, "HakoJS.SourceGeneration.JSObjectAttribute");
+
+            var arrayMethod = isItemMarshalable ? "ToArrayOf" : "ToArray";
+            var arrayExpr = $"{jsValueName}.{arrayMethod}<{type.ItemType}>()";
+
+            // Check the specific collection type and convert appropriately
+            var typeDefinition = type.FullName.Replace("global::", "");
+            if (typeDefinition.StartsWith("System.Collections.Generic.List<"))
+                // For List<T>, wrap the array in a List constructor
+                return $"new {type.FullName}({arrayExpr})";
+
+            if (typeDefinition.StartsWith("System.Collections.Generic.IList<") ||
+                typeDefinition.StartsWith("System.Collections.Generic.ICollection<") ||
+                typeDefinition.StartsWith("System.Collections.Generic.IEnumerable<") ||
+                typeDefinition.StartsWith("System.Collections.Generic.IReadOnlyList<") ||
+                typeDefinition.StartsWith("System.Collections.Generic.IReadOnlyCollection<"))
+                // For interfaces, the array can be used directly (implicit conversion)
+                return arrayExpr;
+
+            // Fallback for other collection types
+            return arrayExpr;
+        }
+
         switch (type.SpecialType)
         {
             case SpecialType.System_String:
@@ -1226,12 +1280,15 @@ public partial class JSBindingGenerator
                 return $"{jsValueName}.AsDateTime()";
         }
 
-        if (type.FullName == "global::System.Byte[]")
+        if (type.FullName is "global::System.Byte[]" or "byte[]" ||
+            (type.IsArray && type.ItemTypeSymbol?.SpecialType == SpecialType.System_Byte))
             return
                 $"({jsValueName}.IsArrayBuffer() ? {jsValueName}.CopyArrayBuffer() : {jsValueName}.CopyTypedArray())";
 
         if (type is { IsArray: true, ElementType: not null })
         {
+            var elementTypeName = type.ElementType.Replace("global::", "");
+
             // Check if element is a [JSEnum]
             if (type.ItemTypeSymbol != null && type.ItemTypeSymbol.IsJSEnum())
             {
@@ -1247,6 +1304,14 @@ public partial class JSBindingGenerator
                         $"{jsValueName}.ToArray<string>().Select(x => global::System.Enum.Parse<{fullEnumType}>(x, ignoreCase: true)).ToArray()";
                 }
             }
+
+            // Handle arrays of primitives
+            if (IsPrimitiveTypeName(type.ElementType) ||
+                elementTypeName is "System.Object" or "object")
+                return $"{jsValueName}.ToArray<{type.ElementType}>()";
+
+            // Handle arrays of marshalable types
+            return $"{jsValueName}.ToArrayOf<{type.ElementType}>()";
         }
 
         return $"{type.FullName}.FromJSValue({contextVarName}, {jsValueName})";
@@ -1298,7 +1363,8 @@ public partial class JSBindingGenerator
         // Handle [JSEnum]
         if (type.IsEnum) return type.IsFlags ? "a number (flags enum)" : "a string (enum)";
 
-        if (type.FullName == "global::System.Byte[]")
+        if (type.FullName is "global::System.Byte[]" or "byte[]" ||
+            (type.IsArray && type.ItemTypeSymbol?.SpecialType == SpecialType.System_Byte))
             return "an ArrayBuffer or TypedArray";
 
         if (type.IsArray)
@@ -1422,7 +1488,8 @@ public partial class JSBindingGenerator
                 : $"{ctxName}.NewString({valueName}.ToStringFast())";
         }
 
-        if (type.FullName == "global::System.Byte[]")
+        if (type.FullName is "global::System.Byte[]" or "byte[]" ||
+            (type.IsArray && type.ItemTypeSymbol?.SpecialType == SpecialType.System_Byte))
             return type.IsNullable
                 ? $"({valueName} == null ? {ctxName}.Null() : {ctxName}.NewArrayBuffer({valueName}))"
                 : $"{ctxName}.NewArrayBuffer({valueName})";

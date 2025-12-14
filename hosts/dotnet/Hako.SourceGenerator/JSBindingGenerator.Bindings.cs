@@ -482,7 +482,12 @@ public partial class JSBindingGenerator
 
     private static bool IsArrayType(TypeInfo type)
     {
-        return type.IsArray && type.FullName != "global::System.Byte[]";
+        // Exclude byte[] from generic array handling (it uses ArrayBuffer/TypedArray)
+        if (type.FullName is "global::System.Byte[]" or "byte[]" ||
+            (type.IsArray && type.ItemTypeSymbol?.SpecialType == SpecialType.System_Byte))
+            return false;
+
+        return type.IsArray;
     }
 
     #endregion
