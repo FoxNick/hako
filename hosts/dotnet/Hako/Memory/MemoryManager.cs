@@ -255,4 +255,60 @@ internal class MemoryManager
     }
 
     #endregion
+
+    #region PropDescriptor Operations
+
+    private const int PropDescriptorSize = 12; // value/get (4) + set (4) + flags (1) + padding (3)
+
+    /// <summary>
+    /// Allocates a PropDescriptor for a data property (value-based).
+    /// </summary>
+    public DisposableValue<PropDescriptorPointer> AllocateDataPropertyDescriptor(
+        int ctx,
+        JSValuePointer value,
+        PropFlags flags)
+    {
+        int ptr = AllocateMemory(ctx, PropDescriptorSize);
+
+        // Write value pointer at offset 0
+        WriteUint32(ptr, (uint)(int)value);
+        // Write 0 for set pointer at offset 4 (not used for data descriptor)
+        WriteUint32(ptr + 4, 0);
+        // Write flags at offset 8
+        Memory.GetSpan(ptr + 8, 1)[0] = (byte)(flags | PropFlags.HasValue);
+
+        return new DisposableValue<PropDescriptorPointer>(
+            new PropDescriptorPointer(ptr),
+            p => FreeMemory(ctx, p));
+    }
+
+    /// <summary>
+    /// Allocates a PropDescriptor for an accessor property (getter/setter).
+    /// </summary>
+    public DisposableValue<PropDescriptorPointer> AllocateAccessorPropertyDescriptor(
+        int ctx,
+        JSValuePointer getter,
+        JSValuePointer setter,
+        PropFlags flags)
+    {
+        int ptr = AllocateMemory(ctx, PropDescriptorSize);
+
+        // Write getter pointer at offset 0
+        WriteUint32(ptr, (uint)(int)getter);
+        // Write setter pointer at offset 4
+        WriteUint32(ptr + 4, (uint)(int)setter);
+        // Write flags at offset 8 (include HasGet/HasSet based on non-null pointers)
+        var effectiveFlags = flags;
+        if (!getter.IsNull)
+            effectiveFlags |= PropFlags.HasGet;
+        if (!setter.IsNull)
+            effectiveFlags |= PropFlags.HasSet;
+        Memory.GetSpan(ptr + 8, 1)[0] = (byte)effectiveFlags;
+
+        return new DisposableValue<PropDescriptorPointer>(
+            new PropDescriptorPointer(ptr),
+            p => FreeMemory(ctx, p));
+    }
+
+    #endregion
 }

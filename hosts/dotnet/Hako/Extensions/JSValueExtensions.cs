@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using HakoJS.Exceptions;
+using HakoJS.Host;
 using HakoJS.Lifetime;
 using HakoJS.SourceGeneration;
 using HakoJS.VM;
@@ -969,26 +970,28 @@ public static class JSValueExtensions
         var realm = obj.Realm;
         using var keyValue = realm.NewString(key);
 
+        var flags = PropFlags.HasWritable;
+        if (configurable) flags |= PropFlags.Configurable;
+        if (enumerable) flags |= PropFlags.Enumerable;
+        if (writable) flags |= PropFlags.Writable;
+
+        using var desc = realm.Runtime.Memory.AllocateDataPropertyDescriptor(
+            realm.Pointer,
+            value.GetHandle(),
+            flags);
+
         var result = realm.Runtime.Registry.DefineProp(
             realm.Pointer,
             obj.GetHandle(),
             keyValue.GetHandle(),
-            value.GetHandle(),
-            realm.Runtime.Registry.GetUndefined(), // get
-            realm.Runtime.Registry.GetUndefined(), // set
-            configurable ? 1 : 0,
-            enumerable ? 1 : 0,
-            1, // hasValue
-            1, // hasWritable
-            writable ? 1 : 0
-        );
+            desc.Value);
 
         if (result == -1)
         {
             var exception = realm.GetLastError();
             if (exception is not null)
                 throw new HakoException($"Failed to define property '{key}'", exception);
-        
+
             throw new HakoException($"Failed to define property '{key}'",
                 new JavaScriptException("(unknown error)"));
         }

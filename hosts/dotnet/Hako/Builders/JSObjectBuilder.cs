@@ -451,19 +451,21 @@ public sealed class JSObjectBuilder : IDisposable
     {
         using var keyValue = _context.NewString(key);
 
+        var flags = PropFlags.HasWritable;
+        if (entry.Configurable) flags |= PropFlags.Configurable;
+        if (entry.Enumerable) flags |= PropFlags.Enumerable;
+        if (entry.Writable) flags |= PropFlags.Writable;
+
+        using var desc = _context.Runtime.Memory.AllocateDataPropertyDescriptor(
+            _context.Pointer,
+            value.GetHandle(),
+            flags);
+
         var result = _context.Runtime.Registry.DefineProp(
             _context.Pointer,
-            obj.GetHandle(), // this_obj
-            keyValue.GetHandle(), // prop_name (string)
-            value.GetHandle(), // prop_value (data)
-            _context.Runtime.Registry.GetUndefined(), // get
-            _context.Runtime.Registry.GetUndefined(), // set
-            entry.Configurable ? 1 : 0, // configurable (presence+value handled in native)
-            entry.Enumerable ? 1 : 0, // enumerable
-            1, // hasValue (we always pass a value here)
-            1, // hasWritable (we always specify writability)
-            entry.Writable ? 1 : 0 // writable
-        );
+            obj.GetHandle(),
+            keyValue.GetHandle(),
+            desc.Value);
 
         if (result == -1)
         {

@@ -362,19 +362,21 @@ public class JSClass : IDisposable
 
         try
         {
+            var flags = PropFlags.None;
+            if (prop.Configurable) flags |= PropFlags.Configurable;
+            if (prop.Enumerable) flags |= PropFlags.Enumerable;
+
+            using var desc = _context.Runtime.Memory.AllocateAccessorPropertyDescriptor(
+                _context.Pointer,
+                getterFunc?.GetHandle() ?? JSValuePointer.Null,
+                setterFunc?.GetHandle() ?? JSValuePointer.Null,
+                flags);
+
             var result = _context.Runtime.Registry.DefineProp(
                 _context.Pointer,
                 target.GetHandle(),
                 propName.GetHandle(),
-                _context.Runtime.Registry.GetUndefined(), // value (not used for accessor)
-                getterFunc?.GetHandle() ?? _context.Runtime.Registry.GetUndefined(), // getter
-                setterFunc?.GetHandle() ?? _context.Runtime.Registry.GetUndefined(), // setter
-                prop.Configurable ? 1 : 0, // configurable
-                prop.Enumerable ? 1 : 0, // enumerable
-                0, // hasValue (accessor property)
-                0, // hasWritable (accessor property)
-                0 // writable (not used)
-            );
+                desc.Value);
 
             if (result == -1)
             {
