@@ -444,7 +444,7 @@ public partial class JSBindingGenerator
 
         sb.AppendLine("    public global::HakoJS.VM.JSValue ToJSValue(global::HakoJS.VM.Realm realm)");
         sb.AppendLine("    {");
-        sb.AppendLine($"        var jsClass = realm.Runtime.GetJSClass<{model.ClassName}>();");
+        sb.AppendLine($"        var jsClass = realm.Runtime.GetJSClass<{model.ClassName}>(realm);");
         sb.AppendLine("        if (jsClass == null)");
         sb.AppendLine("        {");
         sb.AppendLine("            throw new global::System.InvalidOperationException(");
@@ -482,7 +482,12 @@ public partial class JSBindingGenerator
 
     private static bool IsArrayType(TypeInfo type)
     {
-        return type.IsArray && type.FullName != "global::System.Byte[]";
+        // Exclude byte[] from generic array handling (it uses ArrayBuffer/TypedArray)
+        if (type.FullName is "global::System.Byte[]" or "byte[]" ||
+            (type.IsArray && type.ItemTypeSymbol?.SpecialType == SpecialType.System_Byte))
+            return false;
+
+        return type.IsArray;
     }
 
     #endregion

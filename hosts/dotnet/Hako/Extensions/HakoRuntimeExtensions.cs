@@ -51,31 +51,35 @@ public static class HakoRuntimeExtensions
     
     
     /// <summary>
-    /// Registers a JSClass in the runtime's global registry.
+    /// Registers a JSClass in the runtime's registry for the specified realm.
     /// This allows bidirectional marshaling between C# and JavaScript.
-    /// Classes are automatically cleaned up when their associated context is disposed.
+    /// Classes are automatically cleaned up when their associated realm is disposed.
     /// </summary>
     public static void RegisterJSClass<T>(this HakoRuntime runtime, JSClass jsClass) where T : class, IJSBindable<T>
     {
         ArgumentNullException.ThrowIfNull(runtime);
         ArgumentNullException.ThrowIfNull(T.TypeKey);
         ArgumentNullException.ThrowIfNull(jsClass);
-        if (!runtime.JSClassRegistry.TryAdd(T.TypeKey, jsClass))
+
+        var key = (jsClass.Context.Pointer, T.TypeKey);
+        if (!runtime.JSClassRegistry.TryAdd(key, jsClass))
         {
-            throw new HakoException($"Failed to register JSClass for type '{T.TypeKey}'");
+            throw new HakoException($"JSClass for type '{T.TypeKey}' is already registered in this realm");
         }
     }
 
     /// <summary>
-    /// Gets a previously registered JSClass by its type key.
+    /// Gets a previously registered JSClass by its type key for the specified realm.
     /// Returns null if the class hasn't been registered.
     /// </summary>
-    public static JSClass? GetJSClass<T>(this HakoRuntime runtime) where T : class, IJSBindable<T>
+    public static JSClass? GetJSClass<T>(this HakoRuntime runtime, Realm realm) where T : class, IJSBindable<T>
     {
         ArgumentNullException.ThrowIfNull(runtime);
+        ArgumentNullException.ThrowIfNull(realm);
         ArgumentNullException.ThrowIfNull(T.TypeKey);
 
-        return runtime.JSClassRegistry.GetValueOrDefault(T.TypeKey);
+        var key = (realm.Pointer, T.TypeKey);
+        return runtime.JSClassRegistry.GetValueOrDefault(key);
     }
 
     public static CModule CreateModule<T>(

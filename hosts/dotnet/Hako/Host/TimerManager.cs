@@ -152,10 +152,23 @@ public sealed class TimerManager : IDisposable
 
                     if (entry.IsRepeating && entry.Interval.HasValue)
                     {
-                        // Schedule next execution for interval timers
-                        entry.ExecuteAt = DateTime.UtcNow.AddMilliseconds(entry.Interval.Value);
+                        // Schedule next execution based on the original scheduled time, not current time
+                        // This prevents timer drift caused by callback execution time
+                        var nextExecuteAt = entry.ExecuteAt.AddMilliseconds(entry.Interval.Value);
 
-                        var nextExecution = (entry.ExecuteAt - DateTime.UtcNow).TotalMilliseconds;
+                        // If we've fallen behind (next execution is already in the past),
+                        // skip to the next future interval to avoid a backlog of immediate fires
+                        now = DateTime.UtcNow;
+                        if (nextExecuteAt <= now)
+                        {
+                            var missedMs = (now - nextExecuteAt).TotalMilliseconds;
+                            var intervalsToSkip = (long)Math.Ceiling(missedMs / entry.Interval.Value);
+                            nextExecuteAt = nextExecuteAt.AddMilliseconds(intervalsToSkip * entry.Interval.Value);
+                        }
+
+                        entry.ExecuteAt = nextExecuteAt;
+
+                        var nextExecution = (entry.ExecuteAt - now).TotalMilliseconds;
                         if (nextExecution < nextTimerDelay) nextTimerDelay = (int)Math.Ceiling(nextExecution);
                     }
                     else

@@ -925,7 +925,8 @@ public partial class JSBindingGenerator
         if (typeInfo.SpecialType != SpecialType.None)
             return;
 
-        if (typeInfo.FullName == "global::System.Byte[]")
+        if (typeInfo.FullName is "global::System.Byte[]" or "byte[]" ||
+            (typeInfo.IsArray && typeInfo.ItemTypeSymbol?.SpecialType == SpecialType.System_Byte))
             return;
 
         if (IsSpecialMarshalingType(typeInfo.FullName))
