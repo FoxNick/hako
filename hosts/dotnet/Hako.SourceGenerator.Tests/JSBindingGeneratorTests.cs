@@ -225,7 +225,7 @@ namespace HakoJS.VM
     public class HakoRuntime 
     { 
         public void RegisterJSClass<T>(JSClass jsClass) { }
-        public JSClass GetJSClass<T>() { return null; }
+        public JSClass GetJSClass<T>(Realm realm) { return null; }
         public Realm GetSystemRealm() { return new Realm(); }
         public HakoJS.Host.CModule CreateCModule(string name, System.Action<object> init, Realm realm) { return new HakoJS.Host.CModule(); }
     }

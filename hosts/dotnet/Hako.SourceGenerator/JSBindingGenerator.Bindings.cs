@@ -444,7 +444,7 @@ public partial class JSBindingGenerator
 
         sb.AppendLine("    public global::HakoJS.VM.JSValue ToJSValue(global::HakoJS.VM.Realm realm)");
         sb.AppendLine("    {");
-        sb.AppendLine($"        var jsClass = realm.Runtime.GetJSClass<{model.ClassName}>();");
+        sb.AppendLine($"        var jsClass = realm.Runtime.GetJSClass<{model.ClassName}>(realm);");
         sb.AppendLine("        if (jsClass == null)");
         sb.AppendLine("        {");
         sb.AppendLine("            throw new global::System.InvalidOperationException(");

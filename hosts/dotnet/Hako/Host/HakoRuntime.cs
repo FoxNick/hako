@@ -45,7 +45,7 @@ public sealed class HakoRuntime : IDisposable
     private PromiseRejectionTrackerFunction? _currentPromiseRejectionTracker;
     private bool _disposed;
     private Realm? _systemRealm;
-    internal readonly ConcurrentDictionary<string, JSClass> JSClassRegistry = new();
+    internal readonly ConcurrentDictionary<(int RealmPtr, string TypeKey), JSClass> JSClassRegistry = new();
     private readonly WasmEngine _engine;
     private readonly WasmStore _store;
     private readonly WasmInstance _instance;
@@ -368,13 +368,13 @@ public sealed class HakoRuntime : IDisposable
     {
         // Find and dispose all JSClasses belonging to this realm
         var classesToRemove = JSClassRegistry
-            .Where(kv => kv.Value.Context.Pointer == realmPtr)
+            .Where(kv => kv.Key.RealmPtr == realmPtr)
             .Select(kv => kv.Key)
             .ToList();
 
-        foreach (var typeKey in classesToRemove)
+        foreach (var key in classesToRemove)
         {
-            if (JSClassRegistry.TryRemove(typeKey, out var jsClass))
+            if (JSClassRegistry.TryRemove(key, out var jsClass))
             {
                 try
                 {
@@ -382,7 +382,7 @@ public sealed class HakoRuntime : IDisposable
                 }
                 catch (Exception ex)
                 {
-                    throw new HakoException($"Error disposing JSClass '{typeKey}' for realm {realmPtr}", ex);
+                    throw new HakoException($"Error disposing JSClass '{key.TypeKey}' for realm {realmPtr}", ex);
                 }
             }
         }
